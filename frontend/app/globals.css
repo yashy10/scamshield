@@ -1,0 +1,111 @@
+@import "tailwindcss";
+
+/* ScamShield, night edition.
+   A deep airmail-navy, not a neutral black: the brand's blue carried into the dark. The airmail stripe
+   appears in exactly two places (the logo and the status panel). Status colors carry meaning only and
+   always travel with an icon and words. One family: Atkinson Hyperlegible Next, drawn for low vision. */
+
+@theme {
+  --color-bg: #0a1020;
+  --color-raised: #0d1426;
+  --color-surface: #111a2e;
+  --color-surface-2: #18223b;
+  --color-surface-3: #1f2a47;
+  --color-line: #26324f;
+  --color-line-strong: #34436a;
+  --color-ink: #eef2fa;
+  --color-ink-2: #b7c1d8;
+  --color-muted: #8d99b5;
+  --color-accent: #93abff;
+  --color-primary: #3b5bdb;
+  --color-primary-hover: #4a6aea;
+  --color-airmail-red: #e5484d;
+  --color-airmail-blue: #3b5bdb;
+
+  --color-scam: #d03b3b;
+  --color-careful: #fab219;
+  --color-safe: #0ca30c;
+  --color-waiting: #4b5878;
+  --color-scam-text: #ff8a8a;
+  --color-careful-text: #ffc94d;
+  --color-safe-text: #5bd68a;
+
+  --font-sans: var(--font-atkinson), "Atkinson Hyperlegible", ui-sans-serif, system-ui, sans-serif;
+
+  --radius-card: 16px;
+  --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@layer base {
+/* 18px base; "Larger text" in Settings bumps the whole scale. */
+html { font-size: 112.5%; color-scheme: dark; background: var(--color-bg); }
+html[data-text="large"] { font-size: 125%; }
+html[data-text="largest"] { font-size: 137.5%; }
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection { background: color-mix(in oklab, var(--color-accent) 40%, transparent); }
+
+:focus-visible {
+  outline: 3px solid var(--color-careful);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+h1, h2, h3 { text-wrap: balance; letter-spacing: -0.015em; }
+p { text-wrap: pretty; }
+
+}
+
+.num { font-variant-numeric: tabular-nums; }
+
+/* The airmail stripe: the brand's one ornament. */
+.airmail {
+  background-image: repeating-linear-gradient(
+    135deg,
+    var(--color-airmail-red) 0 14px,
+    transparent 14px 22px,
+    var(--color-airmail-blue) 22px 36px,
+    transparent 36px 44px
+  );
+}
+
+/* Status ring: draws in once on load. */
+@keyframes ring-draw {
+  from { stroke-dasharray: 0 var(--c); }
+}
+/* Segments sweep one after another, so the ring reads as one continuous draw. */
+.ring-seg { animation: ring-draw 0.6s linear both; animation-delay: var(--delay, 0ms); }
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.rise { animation: rise 0.5s var(--ease-out-soft) both; animation-delay: var(--delay, 0ms); }
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.pulse-dot { animation: pulse-dot 1.4s ease-in-out infinite; }
+
+/* Radix dialog sheet */
+@keyframes sheet-in { from { transform: translateX(100%); } to { transform: none; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.sheet-content[data-state="open"] { animation: sheet-in 0.28s var(--ease-out-soft); }
+.sheet-overlay[data-state="open"], .palette-overlay[data-state="open"] { animation: fade-in 0.2s ease-out; }
+
+/* cmdk */
+[cmdk-item][data-selected="true"] { background: var(--color-surface-3); }
+[cmdk-group-heading] { padding: 0.75rem 0.75rem 0.35rem; font-size: 0.75rem; color: var(--color-muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-delay: 0ms !important; transition-duration: 0.01ms !important; }
+}

@@ -34,3 +34,7 @@ ScamShield PRD.pdf
 # Vercel CLI link
 .vercel
 .env*
+frontend/node_modules/
+frontend/.next/
+frontend/next-env.d.ts
+frontend/*.tsbuildinfo
