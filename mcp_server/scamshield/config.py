@@ -58,6 +58,9 @@ class Settings:
     workload_name: str | None
     google_provider_name: str
     safe_browsing_provider_name: str
+    # A return URL registered on the workload identity. AgentCore requires one on every Gmail token
+    # fetch, even when the token is already stored; it's only followed if consent is missing.
+    oauth_return_url: str
 
     # Scan limits.
     gmail_lookback_days: int
@@ -94,6 +97,7 @@ def get_settings() -> Settings:
         workload_name=os.environ.get("SCAMSHIELD_WORKLOAD_NAME") or None,
         google_provider_name=os.environ.get("SCAMSHIELD_GOOGLE_PROVIDER", "scamshield-google"),
         safe_browsing_provider_name=os.environ.get("SCAMSHIELD_SAFE_BROWSING_PROVIDER", "scamshield-safe-browsing"),
+        oauth_return_url=os.environ.get("SCAMSHIELD_OAUTH_RETURN_URL", "http://localhost:8080/connect/callback"),
         gmail_lookback_days=_env_int("SCAMSHIELD_LOOKBACK_DAYS", 3),
         max_emails_per_scan=_env_int("SCAMSHIELD_MAX_EMAILS", 10),
         max_links_per_email=_env_int("SCAMSHIELD_MAX_LINKS", 10),

@@ -40,6 +40,10 @@
           "value": "scamshield-gmail"
         },
         {
+          "name": "SCAMSHIELD_OAUTH_RETURN_URL",
+          "value": "https://scamshield-lac-two.vercel.app/connect/callback"
+        },
+        {
           "name": "SCAMSHIELD_GOOGLE_PROVIDER",
           "value": "scamshield-google"
         },

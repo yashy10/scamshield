@@ -179,7 +179,14 @@ def test_full_signup_agentcore_identity(tmp_path):
         stub.add_response("complete_resource_token_auth", {},
                           {"userIdentifier": {"userId": user_id}, "sessionUri": "urn:session:1"})
         stub.add_response("get_workload_access_token_for_user_id", {"workloadAccessToken": "wat2"})
-        stub.add_response("get_resource_oauth2_token", {"accessToken": "ya29.from-vault"})
+        stub.add_response(
+            "get_resource_oauth2_token", {"accessToken": "ya29.from-vault"},
+            # Fetching the stored token must repeat the return URL and the consent's custom parameters.
+            {"workloadIdentityToken": "wat2", "resourceCredentialProviderName": "ScamShield_default_GoogleGmail",
+             "scopes": GMAIL_SCOPES, "oauth2Flow": "USER_FEDERATION",
+             "resourceOauth2ReturnUrl": "http://localhost:8080/connect/callback",
+             "customParameters": {"access_type": "offline", "prompt": "consent"}},
+        )
         done = client.get("/connect/callback", params={"session_id": "urn:session:1"})
         assert done.headers["location"] == f"/protected/{token}"
         assert store.get_user(user_id).email == "margaret.demo@gmail.com"

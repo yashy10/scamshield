@@ -65,7 +65,7 @@ def make_credentials(s: Settings) -> tuple[GmailTokenProvider, ApiKeyProvider]:
         if not s.workload_name:
             raise ValueError("SCAMSHIELD_WORKLOAD_NAME (the MCP runtime's workload identity) must be set.")
         return (
-            AgentCoreGmailTokenProvider(s.workload_name, s.google_provider_name, s.aws_region),
+            AgentCoreGmailTokenProvider(s.workload_name, s.google_provider_name, s.aws_region, s.oauth_return_url),
             AgentCoreApiKeyProvider(s.workload_name, s.safe_browsing_provider_name, s.aws_region),
         )
     raise ValueError(f"Unknown SCAMSHIELD_CREDENTIALS: {s.credentials_backend!r}")

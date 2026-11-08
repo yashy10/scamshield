@@ -12,6 +12,9 @@ from scamshield.credentials import (
 )
 
 
+RETURN_URL = "https://scamshield.example/connect/callback"
+
+
 @pytest.fixture
 def client():
     c = boto3.client(
@@ -41,10 +44,13 @@ def test_gmail_token_from_vault(client):
             "resourceCredentialProviderName": "scamshield-google",
             "scopes": GMAIL_SCOPES,
             "oauth2Flow": "USER_FEDERATION",
-            "customParameters": {"access_type": "offline"},
+            # AgentCore requires a registered return URL on every fetch, and the consent's custom
+            # parameters; without either it refuses or starts a new consent instead.
+            "resourceOauth2ReturnUrl": RETURN_URL,
+            "customParameters": {"access_type": "offline", "prompt": "consent"},
         },
     )
-    provider = AgentCoreGmailTokenProvider("mcp-runtime-id", "scamshield-google", "us-east-1", client=c)
+    provider = AgentCoreGmailTokenProvider("mcp-runtime-id", "scamshield-google", "us-east-1", RETURN_URL, client=c)
     assert provider.access_token("grandma") == "ya29.token"
 
 
@@ -55,7 +61,7 @@ def test_gmail_not_connected_hides_consent_url(client):
         "get_resource_oauth2_token",
         {"authorizationUrl": "https://accounts.google.com/o/oauth2/auth?x=1", "sessionUri": "urn:s"},
     )
-    provider = AgentCoreGmailTokenProvider("mcp-runtime-id", "scamshield-google", "us-east-1", client=c)
+    provider = AgentCoreGmailTokenProvider("mcp-runtime-id", "scamshield-google", "us-east-1", RETURN_URL, client=c)
     with pytest.raises(CredentialError) as err:
         provider.access_token("grandma")
     assert "not connected" in str(err.value)
@@ -65,14 +71,14 @@ def test_gmail_not_connected_hides_consent_url(client):
 def test_gmail_identity_error_is_friendly(client):
     c, stub = client
     stub.add_client_error("get_workload_access_token_for_user_id", service_error_code="AccessDeniedException")
-    provider = AgentCoreGmailTokenProvider("mcp-runtime-id", "scamshield-google", "us-east-1", client=c)
+    provider = AgentCoreGmailTokenProvider("mcp-runtime-id", "scamshield-google", "us-east-1", RETURN_URL, client=c)
     with pytest.raises(CredentialError, match="AccessDeniedException"):
         provider.access_token("grandma")
 
 
 def test_gmail_rejects_bad_user_id_before_calling_aws(client):
     c, _ = client
-    provider = AgentCoreGmailTokenProvider("mcp-runtime-id", "scamshield-google", "us-east-1", client=c)
+    provider = AgentCoreGmailTokenProvider("mcp-runtime-id", "scamshield-google", "us-east-1", RETURN_URL, client=c)
     with pytest.raises(CredentialError):
         provider.access_token("../../evil")
 

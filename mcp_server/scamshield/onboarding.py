@@ -19,6 +19,7 @@ from typing import Any
 
 from .config import Settings
 from .credentials import (
+    GMAIL_CONSENT_PARAMS,
     GMAIL_SCOPES,
     AgentCoreGmailTokenProvider,
     LocalGmailTokenProvider,
@@ -27,7 +28,7 @@ from .credentials import (
 )
 from .store import Invite, Store, UserProfile, now_iso
 
-CONSENT_PARAMS = {"access_type": "offline", "prompt": "consent"}  # a refresh token on every (re)consent
+CONSENT_PARAMS = GMAIL_CONSENT_PARAMS  # a refresh token on every (re)consent; token fetches must match
 
 
 class ConsentError(Exception):
@@ -119,7 +120,8 @@ class IdentityConsent:
                 raise ConsentError("This sign-in doesn’t match the one started in this browser. Start again.")
             self._client.complete_resource_token_auth(userIdentifier={"userId": user_id}, sessionUri=session_id)
         provider = AgentCoreGmailTokenProvider(
-            self.settings.workload_name, self.settings.google_provider_name, self.settings.aws_region, client=self._client
+            self.settings.workload_name, self.settings.google_provider_name, self.settings.aws_region,
+            return_url=self.return_url, client=self._client,
         )
         return provider.access_token(user_id)
 

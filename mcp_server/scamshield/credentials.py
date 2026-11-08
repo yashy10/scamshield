@@ -19,6 +19,9 @@ from typing import Protocol
 import httpx2
 
 GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]
+# Sent on the consent AND on every later token fetch: AgentCore Identity only returns the stored token
+# when the custom parameters match the ones the consent used (otherwise it starts a new consent).
+GMAIL_CONSENT_PARAMS = {"access_type": "offline", "prompt": "consent"}
 _USER_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 _GOOGLE_TOKEN_URI = "https://oauth2.googleapis.com/token"
 
@@ -114,16 +117,21 @@ class EnvApiKeyProvider:
 class AgentCoreGmailTokenProvider:
     """Phase 3: the user's Gmail token comes from the AgentCore Identity token vault.
 
-    The vault is keyed by (workload identity, user id). `scripts/connect_gmail_identity.py` puts the
-    token there through Google's consent screen; Identity refreshes it with the stored refresh token.
-    Policy at the Gateway pins `user_id` to the caller, so a tool can't ask for someone else's token.
+    The vault is keyed by (workload identity, user id). The sign-up site (or
+    `scripts/connect_gmail_identity.py`) puts the token there through Google's consent screen; Identity
+    refreshes it with the stored refresh token. Policy at the Gateway pins `user_id` to the caller, so a
+    tool can't ask for someone else's token.
+
+    AgentCore requires a return URL registered on the workload identity on every USER_FEDERATION call,
+    even when the token is already stored, and the same custom parameters as the consent.
     """
 
-    def __init__(self, workload_name: str, provider_name: str, region: str, client=None) -> None:
+    def __init__(self, workload_name: str, provider_name: str, region: str, return_url: str, client=None) -> None:
         import boto3
 
         self.workload_name = workload_name
         self.provider_name = provider_name
+        self.return_url = return_url
         self._client = client or boto3.client("bedrock-agentcore", region_name=region)
 
     def access_token(self, user_id: str) -> str:
@@ -139,7 +147,8 @@ class AgentCoreGmailTokenProvider:
                 resourceCredentialProviderName=self.provider_name,
                 scopes=GMAIL_SCOPES,
                 oauth2Flow="USER_FEDERATION",
-                customParameters={"access_type": "offline"},
+                resourceOauth2ReturnUrl=self.return_url,
+                customParameters=GMAIL_CONSENT_PARAMS,
             )
         except ClientError as exc:
             code = exc.response.get("Error", {}).get("Code", "Error")
