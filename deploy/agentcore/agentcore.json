@@ -36,8 +36,12 @@
           "value": "agentcore"
         },
         {
+          "name": "SCAMSHIELD_WORKLOAD_NAME",
+          "value": "scamshield-gmail"
+        },
+        {
           "name": "SCAMSHIELD_GOOGLE_PROVIDER",
-          "value": "ScamShield_default_GoogleGmail"
+          "value": "scamshield-google"
         },
         {
           "name": "SCAMSHIELD_SAFE_BROWSING_PROVIDER",

@@ -63,6 +63,25 @@ Opus 5.5 is already callable from this account (tested); `us.anthropic.claude-op
 - `agentcore dev` will not run these runtimes: it requires code inside the project root
   (`runtime code directory must be within the project root`). Run them locally the way their own READMEs describe.
 
+## Already created (2026-11-07, us-east-1)
+
+The hackathon organization's SCP denies AgentCore and `bedrock-mantle` in us-west-2, so everything is in **us-east-1**.
+
+- `infra/` stack `ScamShieldInfra` is deployed (DynamoDB `ScamShield`, managed policy `ScamShieldMcpServerAccess`); CDK
+  is bootstrapped in us-east-1.
+- AgentCore Identity, created with the AWS CLI rather than `agentcore add credentials`:
+  - workload identity **`scamshield-gmail`**: the Gmail token vault key for every user, shared by the sign-up site
+    and the MCP server (`SCAMSHIELD_WORKLOAD_NAME=scamshield-gmail` is already in `agentcore.json`). Allowed return
+    URLs: `https://scamshield-lac-two.vercel.app/connect/callback`, `http://localhost:8080/connect/callback`.
+  - OAuth2 credential provider **`scamshield-google`** (vendor GoogleOauth2). Load the Google *Web application* client
+    into it with `cd mcp_server && uv run scripts/load_google_client.py ../.local/secrets/google_web_client.json`.
+- The sign-up site runs on Vercel (see the root README); users connect Gmail there.
+
+So in the runbook below: skip the `GoogleGmail` credential in step 4, the Google redirect-URI lookup in step 7,
+setting `SCAMSHIELD_WORKLOAD_NAME` in step 8, and the Gmail connection in step 10. `SCAMSHIELD_GOOGLE_PROVIDER`
+is already `scamshield-google`. After the agent runtime exists, set its ARN on Vercel (`SCAMSHIELD_AGENT_ARN`) so
+the people page's Scan now invokes it.
+
 ## Phase 3 runbook
 
 Run everything from `deploy/` in one shell session; later steps use variables set by earlier ones.

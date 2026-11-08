@@ -38,6 +38,7 @@ infra/                 CDK: DynamoDB table, SES identities, MCP-server IAM polic
 deploy/                AgentCore CLI project + Phase 3 runbook
 demo/                  simulated inbox (inbox.json) and the real demo emails
 web/                   sign-up site: guardian invites, "Connect my Gmail", people page with Scan now
+app.py, requirements.txt, vercel.json   Vercel entry for the sign-up site
 ```
 
 ## What you need to do (credentials)
@@ -79,6 +80,27 @@ client; if Google reports `redirect_uri_mismatch`, set `SCAMSHIELD_WEB_BASE_URL=
 `SCAMSHIELD_CREDENTIALS=agentcore` (Phase 3) AgentCore Identity runs the consent, keeps the token, and returns to
 `http://localhost:8080/connect/callback`, which must be allowed on the MCP runtime's workload identity.
 Scan now runs the local agent, or the deployed one when `SCAMSHIELD_AGENT_ARN` is set.
+
+## Hosting the sign-up site on Vercel
+
+Live at **https://scamshield-lac-two.vercel.app** (Vercel project `scamshield`, scope QuanteaTransfer), deployed
+from `main` on every push. The repo-root `app.py` wraps `web/` for Vercel's FastAPI preset; `requirements.txt`
+and `vercel.json` belong to that deployment only.
+
+- **No AWS keys anywhere.** The site assumes the IAM role `scamshield-vercel` with Vercel's OIDC token
+  (`SCAMSHIELD_AWS_ROLE_ARN`). The role trusts only `owner:quantea-transfer:project:scamshield` and can only use
+  the `ScamShield` table, the `scamshield-gmail` workload identity, the `scamshield-google` provider and its
+  secret, and invoke ScamShield runtimes.
+- **Gmail tokens live in AgentCore Identity** (`SCAMSHIELD_CREDENTIALS=agentcore`): the site only hosts the
+  session-binding callback `/connect/callback`; Vercel never stores a token.
+- **The people page** needs the password in `.local/vercel-admin-password.txt` (`SCAMSHIELD_ADMIN_PASSWORD`; any
+  user name). Scan now there starts the deployed agent once `SCAMSHIELD_AGENT_ARN` is set.
+- Environment (production + preview): `SCAMSHIELD_AWS_ROLE_ARN`, `SCAMSHIELD_AWS_REGION=us-east-1`,
+  `SCAMSHIELD_CREDENTIALS=agentcore`, `SCAMSHIELD_STORE=dynamodb`, `SCAMSHIELD_DYNAMODB_TABLE=ScamShield`,
+  `SCAMSHIELD_WORKLOAD_NAME=scamshield-gmail`, `SCAMSHIELD_GOOGLE_PROVIDER=scamshield-google`,
+  `SCAMSHIELD_WEB_BASE_URL`, and the secrets `SCAMSHIELD_WEB_SECRET`, `SCAMSHIELD_ADMIN_PASSWORD`.
+- Google needs a **Web application** OAuth client whose Authorized redirect URI is the provider's AgentCore
+  callback URL; load it with `cd mcp_server && uv run scripts/load_google_client.py <client.json>`.
 
 ## Design decisions and deviations from the PRD
 
