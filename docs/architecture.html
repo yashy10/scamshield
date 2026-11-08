@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ScamShield Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;700;800&display=swap">
+<style>
+/* Layout: one still architecture diagram filling the screen, with a title and a legend above it.
+   Tokens are the ScamShield app's "night airmail" palette (frontend/app/globals.css). */
+:root {
+  --bg: #0a1020; --raised: #0d1426; --surface: #111a2e; --surface-3: #1f2a47;
+  --line: #26324f; --line-strong: #34436a; --edge: #5a6a96;
+  --ink: #eef2fa; --ink-2: #b7c1d8; --muted: #8d99b5;
+  --accent: #93abff;
+  --airmail-red: #e5484d; --airmail-blue: #3b5bdb;
+  --font: "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 16px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+
+.airmail { height: 6px; background-image: repeating-linear-gradient(135deg, var(--airmail-red) 0 14px, transparent 14px 22px, var(--airmail-blue) 22px 36px, transparent 36px 44px); }
+.page { max-width: 1760px; margin: 0 auto; padding-block: 16px 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 14px; }
+
+.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 28px; }
+.brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.brand svg { width: 40px; height: 29px; flex: none; }
+.brand h1 { margin: 0; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.015em; line-height: 1.15; text-wrap: balance; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 0; padding: 0; list-style: none; color: var(--ink-2); font-size: 0.88rem; }
+.legend li { display: flex; align-items: center; gap: 8px; }
+.legend svg { width: 34px; height: 22px; flex: none; overflow: visible; }
+
+.diagram { background: var(--raised); border: 1px solid var(--line); border-radius: 20px; overflow-x: auto; overflow-y: hidden; }
+.diagram > svg { display: block; width: 100%; height: auto; min-width: 920px; max-height: calc(100dvh - 150px); min-height: 520px; }
+.zone rect { fill: color-mix(in oklab, var(--surface) 42%, transparent); stroke: var(--line-strong); stroke-width: 1.5; stroke-dasharray: 1 7; stroke-linecap: round; }
+.zone .zn { font-size: 18px; font-weight: 800; fill: var(--ink-2); }
+.zone .zs { font-size: 15px; font-weight: 400; fill: var(--muted); }
+.edge { fill: none; stroke: var(--edge); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.elabel { font-size: 15px; fill: var(--muted); }
+.node .box { fill: var(--surface); stroke: var(--line-strong); stroke-width: 1.5; }
+.node.planned .box { stroke-dasharray: 8 6; fill: var(--raised); }
+.node .nm { font-size: 20px; font-weight: 800; fill: var(--ink); }
+.node .sb { font-size: 15.5px; fill: var(--muted); }
+.node .badge-c { fill: var(--surface-3); stroke: var(--line-strong); stroke-width: 1.5; }
+.node .badge-i { color: var(--accent); }
+.node .lap rect { fill: var(--surface-3); stroke: var(--line-strong); stroke-width: 1.2; }
+.node .lap use { color: var(--ink-2); }
+
+.foot { margin: 0 2px; color: var(--muted); font-size: 0.82rem; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-person" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></symbol>
+    <symbol id="i-browser" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 9h18M6.5 6.5h.01M9.5 6.5h.01"/></symbol>
+    <symbol id="i-api" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4c-2 0-3 1-3 3v2c0 1.5-.8 2.5-2 3 1.2.5 2 1.5 2 3v2c0 2 1 3 3 3M16 4c2 0 3 1 3 3v2c0 1.5.8 2.5 2 3-1.2.5-2 1.5-2 3v2c0 2-1 3-3 3"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/></symbol>
+    <symbol id="i-gate" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V10a7 7 0 0 1 14 0v11M3 21h18M9 21v-6h6v6"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></symbol>
+    <symbol id="i-tool" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3.5 17.5l3 3 5.8-5.8a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/></symbol>
+    <symbol id="i-db" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/></symbol>
+    <symbol id="i-mail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M4 7l8 6 8-6"/></symbol>
+    <symbol id="i-signin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M10 16l4-4-4-4M14 12H4"/></symbol>
+    <symbol id="i-inbox" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l3-8h12l3 8v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 13h5l1.5 2.5h5L16 13h5"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 6h10M10 12h10M10 18h10M4 5l1.5 1.5L8 4M4 11l1.5 1.5L8 10M4.5 17.5l3 3M7.5 17.5l-3 3"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.5 3.8 5.5 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.5-3.8-9S9.5 5.5 12 3z"/></symbol>
+    <symbol id="i-laptop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/></symbol>
+  </defs>
+</svg>
+
+<div class="airmail" aria-hidden="true"></div>
+<div class="page">
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 36 26" aria-hidden="true">
+        <defs><pattern id="ss-airmail" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="4" height="8" fill="#e5484d"/><rect x="4" width="4" height="8" fill="#5b7cff"/></pattern></defs>
+        <rect x="0.5" y="0.5" width="35" height="25" rx="5" fill="url(#ss-airmail)"/>
+        <rect x="3" y="3" width="30" height="20" rx="3" fill="#18223b"/>
+        <path d="M5.5 6.5 18 15.5 30.5 6.5" fill="none" stroke="#eef2fa" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <h1>ScamShield architecture</h1>
+    </div>
+    <ul class="legend" aria-label="Legend">
+      <li><svg viewBox="0 0 34 22" aria-hidden="true"><path d="M2 11h26" stroke="#5a6a96" stroke-width="2" stroke-linecap="round"/><path d="M24 6.5l8 4.5-8 4.5z" fill="#5a6a96"/></svg>Calls</li>
+      <li><svg viewBox="0 0 34 22" aria-hidden="true"><rect x="1" y="3" width="32" height="18" rx="5" fill="#111a2e" stroke="#34436a" stroke-width="1.5"/></svg>Live</li>
+      <li><svg viewBox="0 0 34 22" aria-hidden="true"><rect x="1" y="3" width="32" height="18" rx="5" fill="#111a2e" stroke="#34436a" stroke-width="1.5"/><rect x="14" y="-4" width="18" height="13" rx="4" fill="#1f2a47" stroke="#34436a"/><use href="#i-laptop" x="17" y="-3" width="12" height="12" style="color:#b7c1d8"/></svg>Runs on a laptop today</li>
+      <li><svg viewBox="0 0 34 22" aria-hidden="true"><rect x="1" y="3" width="32" height="18" rx="5" fill="#0d1426" stroke="#34436a" stroke-width="1.5" stroke-dasharray="5 4"/></svg>Not deployed yet</li>
+    </ul>
+  </header>
+
+  <section class="diagram">
+    <svg id="svg" viewBox="0 0 1520 870" role="img" aria-label="ScamShield architecture. Family: guardian and protected person. Vercel: Next.js website and Python API. AWS: EventBridge Scheduler, investigator agent on AgentCore Runtime, Claude Opus 5.5 on Bedrock, AgentCore Gateway and Policy, the MCP server, AgentCore Identity, DynamoDB and SES. Google: sign-in, Gmail and Safe Browsing. Public internet: RDAP domain records.">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
+          <path d="M0,0.5 L10,5 L0,9.5 z" fill="#5a6a96"/>
+        </marker>
+      </defs>
+      <g id="zones"></g>
+      <g id="edges"></g>
+      <g id="elabels"></g>
+      <g id="nodes"></g>
+    </svg>
+  </section>
+
+  <p class="foot">Matches the ScamShield code as of November 8, 2026.</p>
+</div>
+
+<script>
+(() => {
+"use strict";
+const SVGNS = "http://www.w3.org/2000/svg";
+
+const ZONES = [
+  { x: 12,   y: 44,  w: 210, h: 756, name: "Family" },
+  { x: 250,  y: 44,  w: 240, h: 396, name: "Vercel", note: "two services" },
+  { x: 518,  y: 44,  w: 750, h: 646, name: "AWS", note: "us-east-1" },
+  { x: 1296, y: 44,  w: 212, h: 586, name: "Google" },
+  { x: 1296, y: 650, w: 212, h: 162, name: "Public internet" },
+];
+
+const NODES = {
+  G:   { x: 122,  y: 160, w: 170, name: "Guardian", sub: "family member", icon: "person" },
+  P:   { x: 122,  y: 560, w: 170, name: "Protected", sub: "inbox owner", icon: "person" },
+  W:   { x: 370,  y: 160, w: 210, name: "Website", sub: "Next.js on Vercel", icon: "browser" },
+  A:   { x: 370,  y: 360, w: 210, name: "API", sub: "Python on Vercel", icon: "api" },
+  S:   { x: 643,  y: 160, w: 210, name: "Scheduler", sub: "EventBridge", icon: "clock", status: "planned" },
+  R:   { x: 643,  y: 360, w: 210, name: "Investigator", sub: "AgentCore Runtime", icon: "search", status: "local" },
+  B:   { x: 643,  y: 560, w: 210, name: "Claude", sub: "Opus 5.5 on Bedrock", icon: "spark" },
+  Y:   { x: 893,  y: 360, w: 210, name: "Gateway", sub: "AgentCore Gateway", icon: "gate", status: "planned" },
+  POL: { x: 893,  y: 160, w: 210, name: "Policy", sub: "AgentCore Policy", icon: "shield", status: "planned" },
+  M:   { x: 1143, y: 360, w: 210, name: "MCP server", sub: "AgentCore Runtime", icon: "tool", status: "local" },
+  I:   { x: 1143, y: 160, w: 210, name: "Identity", sub: "AgentCore Identity", icon: "key" },
+  D:   { x: 893,  y: 560, w: 210, name: "Verdicts", sub: "DynamoDB", icon: "db" },
+  E:   { x: 1143, y: 560, w: 210, name: "Warnings", sub: "Amazon SES", icon: "mail", status: "planned" },
+  GS:  { x: 1402, y: 160, w: 196, name: "Sign-in", sub: "Google OAuth", icon: "signin" },
+  GM:  { x: 1402, y: 360, w: 196, name: "Gmail", sub: "Gmail API", icon: "inbox" },
+  SB:  { x: 1402, y: 560, w: 196, name: "Safe Browsing", sub: "Google threat lists", icon: "list" },
+  RD:  { x: 1402, y: 750, w: 196, name: "Domain age", sub: "public RDAP", icon: "globe" },
+};
+const NODE_H = 84;
+
+// [caller, callee, route points from caller to callee, optional label]. Routes run in the gutters between zones.
+const EDGES = [
+  ["G", "W",   [[207,160],[263,160]]],
+  ["W", "A",   [[370,202],[370,316]], { x: 382, y: 266, text: "service binding" }],
+  ["A", "R",   [[475,372],[536,372]]],
+  ["A", "I",   [[475,342],[504,342],[504,22],[1143,22],[1143,116]], { x: 800, y: 15, text: "OAuth redirects", anchor: "middle" }],
+  ["A", "GS",  [[475,342],[504,342],[504,22],[1402,22],[1402,116]]],
+  ["I", "GS",  [[1248,160],[1302,160]]],
+  ["P", "A",   [[207,560],[236,560],[236,384],[263,384]], { x: 226, y: 476, text: "Connect Gmail", anchor: "end" }],
+  ["S", "R",   [[643,202],[643,316]], { x: 655, y: 266, text: "every 5 min" }],
+  ["R", "B",   [[643,402],[643,516]], { x: 655, y: 503, text: "Converse API" }],
+  ["R", "Y",   [[748,360],[786,360]]],
+  ["Y", "POL", [[893,318],[893,204]], { x: 905, y: 266, text: "Cedar check" }],
+  ["Y", "M",   [[998,360],[1036,360]], { x: 1018, y: 348, text: "MCP", anchor: "middle" }],
+  ["M", "I",   [[1143,318],[1143,204]], { x: 1155, y: 266, text: "tokens + keys" }],
+  ["M", "GM",  [[1248,360],[1302,360]]],
+  ["M", "SB",  [[1248,380],[1282,380],[1282,560],[1302,560]]],
+  ["M", "RD",  [[1248,380],[1282,380],[1282,750],[1302,750]]],
+  ["M", "E",   [[1143,402],[1143,516]], { x: 1155, y: 466, text: "send_warning" }],
+  ["M", "D",   [[1113,402],[1113,460],[923,460],[923,516]], { x: 1018, y: 451, text: "verdicts", anchor: "middle" }],
+  ["R", "D",   [[673,402],[673,460],[863,460],[863,516]], { x: 768, y: 451, text: "profile", anchor: "middle" }],
+  ["A", "D",   [[370,402],[370,650],[893,650],[893,604]], { x: 530, y: 640, text: "invites + verdicts, via OIDC role" }],
+  ["E", "P",   [[1143,602],[1143,836],[122,836],[122,604]], { x: 640, y: 858, text: "warning emails", anchor: "middle" }],
+  ["E", "G",   [[1143,602],[1143,836],[24,836],[24,160],[35,160]]],
+].map(([a, b, pts, label]) => ({ a, b, pts, label }));
+
+function svgEl(tag, attrs, parent) {
+  const n = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(n);
+  return n;
+}
+function roundedPath(pts, r = 12) {
+  let d = `M${pts[0][0]},${pts[0][1]}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const [x0, y0] = pts[i - 1], [x1, y1] = pts[i], [x2, y2] = pts[i + 1];
+    const d1 = Math.hypot(x1 - x0, y1 - y0), d2 = Math.hypot(x2 - x1, y2 - y1);
+    const rr = Math.min(r, d1 / 2, d2 / 2);
+    const ax = x1 - ((x1 - x0) / d1) * rr, ay = y1 - ((y1 - y0) / d1) * rr;
+    const bx = x1 + ((x2 - x1) / d2) * rr, by = y1 + ((y2 - y1) / d2) * rr;
+    d += ` L${ax},${ay} Q${x1},${y1} ${bx},${by}`;
+  }
+  const last = pts[pts.length - 1];
+  return d + ` L${last[0]},${last[1]}`;
+}
+
+const zones = document.getElementById("zones"), edges = document.getElementById("edges");
+const labels = document.getElementById("elabels"), nodes = document.getElementById("nodes");
+
+for (const z of ZONES) {
+  const g = svgEl("g", { class: "zone" }, zones);
+  svgEl("rect", { x: z.x, y: z.y, width: z.w, height: z.h, rx: 22 }, g);
+  const t = svgEl("text", { x: z.x + 18, y: z.y + 30 }, g);
+  svgEl("tspan", { class: "zn" }, t).textContent = z.name;
+  if (z.note) svgEl("tspan", { class: "zs", dx: 10 }, t).textContent = z.note;
+}
+
+for (const e of EDGES) {
+  svgEl("path", { class: "edge", d: roundedPath(e.pts), "marker-end": "url(#arrow)" }, edges);
+  if (e.label) {
+    svgEl("text", { class: "elabel", x: e.label.x, y: e.label.y, "text-anchor": e.label.anchor || "start" }, labels).textContent = e.label.text;
+  }
+}
+
+for (const n of Object.values(NODES)) {
+  const x0 = n.x - n.w / 2, y0 = n.y - NODE_H / 2;
+  const g = svgEl("g", { class: "node" + (n.status === "planned" ? " planned" : "") }, nodes);
+  svgEl("rect", { class: "box", x: x0, y: y0, width: n.w, height: NODE_H, rx: 16 }, g);
+  svgEl("text", { class: "nm", x: x0 + 18, y: n.y - 2 }, g).textContent = n.name;
+  svgEl("text", { class: "sb", x: x0 + 18, y: n.y + 22 }, g).textContent = n.sub;
+  svgEl("circle", { class: "badge-c", cx: x0 + 24, cy: y0, r: 16 }, g);
+  svgEl("use", { class: "badge-i", href: "#i-" + n.icon, x: x0 + 14, y: y0 - 10, width: 20, height: 20 }, g);
+  if (n.status === "local") {
+    const lap = svgEl("g", { class: "lap" }, g);
+    svgEl("rect", { x: x0 + n.w - 48, y: y0 - 12, width: 34, height: 24, rx: 8 }, lap);
+    svgEl("use", { href: "#i-laptop", x: x0 + n.w - 41, y: y0 - 10, width: 20, height: 20 }, lap);
+  }
+}
+})();
+</script>
+</body>
+</html>

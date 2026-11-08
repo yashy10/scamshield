@@ -39,6 +39,7 @@ deploy/                AgentCore CLI project + Phase 3 runbook
 demo/                  simulated inbox (inbox.json) and the real demo emails
 frontend/              the web app (Next.js 16, React 19, Tailwind 4): landing page, sign-in, onboarding, dashboard
 web/                   Python site: JSON API for frontend/, Google sign-in, Gmail consent, admin people page
+docs/architecture.html the architecture diagram (open it in a browser)
 app.py, requirements.txt, vercel.json   Vercel entry for the sign-up site
 ```
 

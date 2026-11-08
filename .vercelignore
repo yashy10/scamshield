@@ -4,6 +4,7 @@ agent/
 infra/
 deploy/
 demo/
+docs/
 web/scripts/
 .local/
 .env
