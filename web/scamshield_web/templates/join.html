@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}ScamShield for {{ invite.protected_name }}{% endblock %}
+{% block content %}
+<section class="envelope">
+  <h1>Hi {{ invite.protected_name }}</h1>
+  <p class="lead">{{ invite.guardian_name }} asked ScamShield to help you spot scam emails. Here’s what that means.</p>
+
+  <div class="two">
+    <div>
+      <h2>What ScamShield does</h2>
+      <ul class="does">
+        <li>Looks at new emails that contain links.</li>
+        <li>Checks those links: is the website known for scams, and how new is it?</li>
+        <li>Adds a “ScamShield” label to risky emails in Gmail.</li>
+        <li>Sends you a short warning, with {{ invite.guardian_name }} copied.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>What it never does</h2>
+      <ul class="never">
+        <li>Delete or move your email.</li>
+        <li>Send email from your account.</li>
+        <li>Show {{ invite.guardian_name }} your emails. {{ invite.guardian_name }} sees warnings only.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>This is what a warning looks like</h2>
+  <figure class="letter" aria-label="An example ScamShield warning email">
+    <div class="letter-head">
+      <p><span class="k">From</span> <span>ScamShield{% if sender %} &lt;{{ sender }}&gt;{% endif %}</span></p>
+      <p><span class="k">Subject</span> <span>ScamShield: likely scam in your inbox</span></p>
+    </div>
+    <div class="letter-body">
+      <p class="alarm">This email is likely a scam. Don’t click its links.</p>
+      <p>The email titled “Your account has been locked”, from chase-secure-login[.]com.</p>
+      <p><strong>Why:</strong></p>
+      <ul>
+        <li>Google lists the link in this email as a known scam site.</li>
+        <li>The website it was sent from was created 3 days ago.</li>
+      </ul>
+      <p><strong>What to do: delete it, and contact the real company through a phone number or website you already trust. Don’t reply to the email.</strong></p>
+    </div>
+  </figure>
+
+  <form method="post" action="/join/{{ invite.token }}/connect" class="connect">
+    <button class="button big" type="submit">Connect my Gmail</button>
+  </form>
+  <p class="quiet">Google will ask you to sign in and allow ScamShield. You can turn it off any time in your Google Account, under Security.</p>
+</section>
+{% endblock %}

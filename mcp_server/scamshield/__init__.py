@@ -1,0 +1,1 @@
+"""ScamShield MCP server package."""

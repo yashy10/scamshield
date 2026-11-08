@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}You’re protected{% endblock %}
+{% block content %}
+<section class="envelope done">
+  <h1>You’re protected, {{ invite.protected_name }}</h1>
+  <p class="lead">ScamShield is now watching {{ invite.connected_email }} for scam emails.</p>
+
+  <h2>What happens next</h2>
+  <ul class="does">
+    <li>Every few minutes, ScamShield checks new emails that contain links.</li>
+    <li>If one looks risky, it gets a “ScamShield” label and you get a warning{% if sender %} from {{ sender }}{% endif %}. {{ invite.guardian_name }} gets a copy.</li>
+    <li>Nothing else changes. Use Gmail the way you always do.</li>
+  </ul>
+  <p class="quiet">To stop ScamShield, remove it in your Google Account, under Security.</p>
+</section>
+{% endblock %}

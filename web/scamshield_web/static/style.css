@@ -1,0 +1,182 @@
+/* ScamShield: an airmail envelope for the one thing on each page; everything else stays quiet.
+   Type is Atkinson Hyperlegible Next, drawn by the Braille Institute for low-vision readers. */
+
+:root {
+  --ink: #1b2333;
+  --muted: #4a5468;
+  --page: #eef1f5;
+  --paper: #ffffff;
+  --line: #cdd4df;
+  --blue: #2348a0;
+  --blue-dark: #1a3577;
+  --red: #c4232f;
+  --green: #2f6b4f;
+  --focus: #f2b705;
+  --stripe: 12px;
+}
+
+html { font-size: 125%; } /* 20px body text */
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font-family: "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", system-ui, sans-serif;
+  line-height: 1.6;
+  -webkit-text-size-adjust: 100%;
+}
+
+.masthead,
+.page { max-width: 44rem; margin: 0 auto; padding-inline: 1rem; }
+.masthead { padding-top: 1.25rem; }
+.page { padding-bottom: 4rem; padding-top: 0.75rem; }
+
+.brand {
+  color: var(--ink);
+  font-weight: 800;
+  font-size: 1.1rem;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+}
+
+/* The envelope: an airmail edge around the page's main panel. */
+.envelope {
+  background: var(--paper);
+  border: var(--stripe) solid transparent;
+  border-image-source: repeating-linear-gradient(
+    135deg,
+    var(--red) 0 16px,
+    var(--paper) 16px 26px,
+    var(--blue) 26px 42px,
+    var(--paper) 42px 52px
+  );
+  border-image-slice: 12; /* unitless, equal to the border width, so the stripes map 1:1 */
+  padding: 2rem 2rem 2.25rem;
+}
+
+/* A plain sheet for working pages (people list, messages). */
+.sheet {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 1.75rem 2rem 2rem;
+}
+
+h1 {
+  font-size: 2.1rem;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  margin: 0 0 0.75rem;
+  max-width: 20em;
+}
+h2 { font-size: 1.1rem; font-weight: 800; margin: 2rem 0 0.4rem; }
+h1, h2 { text-wrap: balance; }
+p, li { max-width: 34em; text-wrap: pretty; }
+p { margin: 0 0 1rem; }
+.lead { font-size: 1.15rem; }
+.quiet { color: var(--muted); font-size: 0.9rem; margin-top: 1.5rem; }
+.hint { color: var(--muted); font-size: 0.85rem; font-weight: 400; display: block; }
+
+a { color: var(--blue); text-underline-offset: 0.15em; }
+a:hover { color: var(--blue-dark); }
+:focus-visible { outline: 4px solid var(--focus); outline-offset: 3px; }
+
+ul { padding-left: 1.3rem; margin: 0; }
+li { margin-bottom: 0.45rem; padding-left: 0.2rem; }
+ul.does li::marker { color: var(--blue); }
+ul.never li::marker { content: "✕  "; color: var(--red); font-weight: 800; }
+
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 0 2.25rem; }
+section.two { margin-top: 0.5rem; }
+
+/* Buttons: one primary action per page, big enough to hit easily. */
+.button {
+  display: inline-block;
+  background: var(--blue);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  font-size: 1.05rem;
+  line-height: 1.2;
+  padding: 0.95rem 1.6rem;
+  border: 2px solid var(--blue);
+  border-radius: 8px;
+  text-decoration: none;
+  cursor: pointer;
+}
+.button:hover { background: var(--blue-dark); border-color: var(--blue-dark); color: #fff; }
+.button.big { font-size: 1.25rem; padding: 1.15rem 2.2rem; }
+.button.small { font-size: 0.9rem; padding: 0.55rem 1rem; }
+.button.secondary { background: var(--paper); color: var(--blue); }
+.button.secondary:hover { background: var(--page); color: var(--blue-dark); }
+
+/* Forms */
+form label { display: block; font-weight: 600; margin: 1.4rem 0 0.35rem; }
+input[type="text"],
+input[type="email"] {
+  box-sizing: border-box;
+  width: 100%;
+  font: inherit;
+  font-size: 1.05rem;
+  color: var(--ink);
+  background: var(--paper);
+  padding: 0.7rem 0.85rem;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+}
+input:focus-visible { border-color: var(--blue); }
+input[aria-invalid="true"] { border-color: var(--red); }
+.error { color: var(--red); font-weight: 600; margin: 0.4rem 0 0; }
+.check { display: flex; gap: 0.75rem; align-items: flex-start; margin-top: 1.6rem; }
+.check label { margin: 0; font-weight: 400; }
+.check input { width: 1.5rem; height: 1.5rem; margin: 0.15rem 0 0; flex: none; accent-color: var(--blue); }
+form .button { margin-top: 1.8rem; }
+
+.linkbox { display: flex; gap: 0.75rem; margin: 1.5rem 0; }
+.linkbox input { flex: 1; font-size: 0.95rem; }
+.linkbox .button { flex: none; }
+
+/* The sample warning: drawn like the email Grandma will actually receive. */
+.letter {
+  margin: 0.75rem 0 2rem;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  overflow: hidden;
+}
+.letter-head { background: var(--page); padding: 0.75rem 1.25rem; border-bottom: 2px solid var(--line); }
+.letter-head p { margin: 0.15rem 0; font-size: 0.95rem; display: grid; grid-template-columns: 5.2rem 1fr; }
+.letter-head .k { color: var(--muted); }
+.letter-body { padding: 1.1rem 1.25rem 0.5rem; }
+.letter-body .alarm { color: var(--red); font-size: 1.2rem; font-weight: 800; line-height: 1.3; }
+.letter-body ul { margin-bottom: 1rem; }
+
+.connect { margin-top: 0.5rem; }
+
+.done h1 { color: var(--green); }
+
+/* People */
+.table-wrap { overflow-x: auto; margin-top: 1rem; }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+th { text-align: left; font-weight: 800; border-bottom: 2px solid var(--ink); padding: 0.5rem 0.75rem 0.5rem 0; }
+td { border-bottom: 1px solid var(--line); padding: 0.75rem 0.75rem 0.75rem 0; vertical-align: top; }
+td .hint { font-size: 0.8rem; }
+td form .button { margin-top: 0; white-space: nowrap; }
+tr.result td { background: var(--page); padding: 0.75rem 1rem; }
+.summary { white-space: pre-wrap; max-width: 46em; }
+.ok { color: var(--green); font-weight: 800; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (max-width: 40rem) {
+  html { font-size: 112.5%; }
+  :root { --stripe: 8px; }
+  .envelope { border-image-slice: 8; }
+  .envelope, .sheet { padding: 1.25rem 1.1rem 1.5rem; }
+  h1 { font-size: 1.7rem; }
+  .two { grid-template-columns: 1fr; }
+  .linkbox { flex-direction: column; }
+  .letter-head p { grid-template-columns: 1fr; margin-bottom: 0.4rem; }
+  .letter-head p span:last-child { overflow-wrap: anywhere; }
+  .button.big { width: 100%; }
+}

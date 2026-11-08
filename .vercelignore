@@ -1,0 +1,11 @@
+# Only the sign-up site (app.py, web/, mcp_server/scamshield) is deployed to Vercel.
+agent/
+infra/
+deploy/
+demo/
+.local/
+.env
+*.pdf
+**/.venv/
+**/tests/
+**/node_modules/

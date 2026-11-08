@@ -1,0 +1,24 @@
+[project]
+name = "scamshield-infra"
+version = "0.1.0"
+description = "ScamShield CDK stack: DynamoDB table, SES identities, MCP server IAM policy, scan schedules."
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "aws-cdk-lib==2.274.0",
+    "constructs==10.8.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+]
+
+[tool.uv]
+# A CDK app, not a library: nothing to build or install.
+package = false
+# Only resolve packages published at least two weeks before this was written.
+exclude-newer = "2026-10-24T00:00:00Z"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

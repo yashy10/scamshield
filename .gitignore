@@ -1,0 +1,32 @@
+# Secrets and local state: never commit
+.env
+secrets/
+.data/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+
+# Generated Cedar policies contain email addresses
+policies/generated/
+
+# CDK build output (infra/)
+cdk.out/
+
+# Local secrets and state (Gmail tokens, OAuth client, verdict store) live outside the code
+# folders so AgentCore CodeZip packaging can never upload them
+.local/
+
+# Browser automation output
+.playwright-mcp/
+
+# The PRD stays on this machine only
+ScamShield PRD.pdf

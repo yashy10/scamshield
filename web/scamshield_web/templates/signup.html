@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Set up ScamShield{% endblock %}
+{% block content %}
+<section class="envelope">
+  <h1>Set up ScamShield for someone</h1>
+  <p>You’ll get a link to send them. They open it and connect their own Gmail.</p>
+
+  <form method="post" action="/signup" novalidate>
+    <label for="guardian_name">Your name</label>
+    <input type="text" id="guardian_name" name="guardian_name" autocomplete="name" value="{{ form.guardian_name or '' }}"
+           {% if errors.guardian_name %}aria-invalid="true" aria-describedby="err-guardian_name"{% endif %}>
+    {% if errors.guardian_name %}<p class="error" id="err-guardian_name">{{ errors.guardian_name }}</p>{% endif %}
+
+    <label for="guardian_email">Your email
+      <span class="hint">Warnings about their inbox are copied here.</span></label>
+    <input type="email" id="guardian_email" name="guardian_email" autocomplete="email" value="{{ form.guardian_email or '' }}"
+           {% if errors.guardian_email %}aria-invalid="true" aria-describedby="err-guardian_email"{% endif %}>
+    {% if errors.guardian_email %}<p class="error" id="err-guardian_email">{{ errors.guardian_email }}</p>{% endif %}
+
+    <label for="protected_name">Their first name
+      <span class="hint">We use it to greet them.</span></label>
+    <input type="text" id="protected_name" name="protected_name" value="{{ form.protected_name or '' }}"
+           {% if errors.protected_name %}aria-invalid="true" aria-describedby="err-protected_name"{% endif %}>
+    {% if errors.protected_name %}<p class="error" id="err-protected_name">{{ errors.protected_name }}</p>{% endif %}
+
+    <div class="check">
+      <input type="checkbox" id="agreed" name="agreed" value="yes"
+             {% if errors.agreed %}aria-invalid="true" aria-describedby="err-agreed"{% endif %}>
+      <label for="agreed">They know about this and want the help.</label>
+    </div>
+    {% if errors.agreed %}<p class="error" id="err-agreed">{{ errors.agreed }}</p>{% endif %}
+
+    <button class="button" type="submit">Create the invite link</button>
+  </form>
+</section>
+{% endblock %}

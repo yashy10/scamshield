@@ -1,0 +1,32 @@
+[project]
+name = "scamshield-web"
+version = "0.1.0"
+description = "ScamShield sign-up site: a guardian invites someone, who connects their Gmail with Google's own consent screen."
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "scamshield-mcp",
+    "starlette>=0.48",
+    "uvicorn>=0.31",
+    "jinja2>=3.1",
+    "itsdangerous>=2.2",
+    "python-multipart>=0.0.20",
+    "google-auth-oauthlib>=1.2",
+    "boto3>=1.40",
+    "fastapi>=0.162.2",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.3", "httpx>=0.28"]
+
+[tool.uv.sources]
+scamshield-mcp = { path = "../mcp_server", editable = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["scamshield_web"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

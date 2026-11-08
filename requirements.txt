@@ -1,0 +1,10 @@
+# Vercel only: dependencies of the sign-up site (app.py -> web/ + mcp_server/scamshield).
+# Each project folder (mcp_server/, agent/, web/, infra/) has its own pyproject.toml for local work.
+fastapi>=0.115
+starlette>=0.48
+jinja2>=3.1
+itsdangerous>=2.2
+python-multipart>=0.0.20
+boto3>=1.40
+httpx2>=2.10
+python-dotenv>=1.0

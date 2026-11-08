@@ -1,0 +1,32 @@
+[project]
+name = "scamshield-mcp"
+version = "0.1.0"
+description = "ScamShield MCP server: the five tools the investigator agent calls through AgentCore Gateway."
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "mcp>=2.3,<3",
+    "boto3>=1.40",
+    "tldextract>=5.1",
+    "python-dotenv>=1.0",
+    # AgentCore Runtime starts the code with `opentelemetry-instrument main.py` (traces to CloudWatch).
+    "aws-opentelemetry-distro~=0.21.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "moto[dynamodb,sesv2]>=5.1",
+    "cedarpy>=4.12",
+    # Only used by scripts/connect_gmail.py to run Google's consent flow locally.
+    "google-auth-oauthlib>=1.2",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["scamshield"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

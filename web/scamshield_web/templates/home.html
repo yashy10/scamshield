@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="envelope">
+  <h1>Help someone you love spot scam emails</h1>
+  <p class="lead">ScamShield checks the links in new emails against real evidence. When one looks like a scam, it labels the email in Gmail and sends a plain warning to them, with you copied.</p>
+  <a class="button" href="/signup">Set it up for someone</a>
+</section>
+
+<section class="two">
+  <div>
+    <h2>What it does</h2>
+    <ul class="does">
+      <li>Checks each link with Google Safe Browsing and looks up how new the website is.</li>
+      <li>Adds a “ScamShield” label to risky emails in Gmail.</li>
+      <li>Emails them a short warning and sends you a copy.</li>
+    </ul>
+  </div>
+  <div>
+    <h2>What it never does</h2>
+    <ul class="never">
+      <li>Delete, move or send their email.</li>
+      <li>Show you their emails. You see warnings only.</li>
+      <li>Ask for their password. They sign in on Google’s own page.</li>
+    </ul>
+  </div>
+</section>
+
+<p class="quiet"><a href="/people">See who’s protected</a></p>
+{% endblock %}

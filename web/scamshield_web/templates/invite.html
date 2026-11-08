@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Invite for {{ invite.protected_name }}{% endblock %}
+{% block content %}
+<section class="envelope">
+  <h1>Send this link to {{ invite.protected_name }}</h1>
+  <p>When {{ invite.protected_name }} opens it, they’ll see what ScamShield does and connect their Gmail on Google’s own page. You’ll be copied on every warning.</p>
+
+  <div class="linkbox">
+    <input type="text" id="invite-link" value="{{ link }}" readonly aria-label="Invite link">
+    <button type="button" class="button secondary" data-copy="invite-link">Copy link</button>
+  </div>
+
+  <p>Setting it up together? <a href="/join/{{ invite.token }}">Open the invite on this computer</a>.</p>
+</section>
+<script>
+  document.querySelectorAll("[data-copy]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const input = document.getElementById(button.dataset.copy);
+      try {
+        await navigator.clipboard.writeText(input.value);
+        button.textContent = "Copied";
+      } catch {
+        input.select();
+      }
+    });
+  });
+</script>
+{% endblock %}

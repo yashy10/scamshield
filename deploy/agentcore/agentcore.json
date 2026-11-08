@@ -1,0 +1,132 @@
+{
+  "name": "ScamShield",
+  "version": 2,
+  "managedBy": "CDK",
+  "runtimes": [
+    {
+      "name": "ScamShieldMcp",
+      "description": "ScamShield MCP server: the five tools, reached only through ScamShieldGateway",
+      "build": "CodeZip",
+      "entrypoint": "main.py",
+      "codeLocation": "../mcp_server",
+      "runtimeVersion": "PYTHON_3_13",
+      "envVars": [
+        {
+          "name": "SCAMSHIELD_HOST",
+          "value": "0.0.0.0"
+        },
+        {
+          "name": "SCAMSHIELD_STORE",
+          "value": "dynamodb"
+        },
+        {
+          "name": "SCAMSHIELD_DYNAMODB_TABLE",
+          "value": "ScamShield"
+        },
+        {
+          "name": "SCAMSHIELD_EMAIL_BACKEND",
+          "value": "ses"
+        },
+        {
+          "name": "SCAMSHIELD_SES_FROM",
+          "value": "CHANGE_ME_SES_FROM"
+        },
+        {
+          "name": "SCAMSHIELD_CREDENTIALS",
+          "value": "agentcore"
+        },
+        {
+          "name": "SCAMSHIELD_GOOGLE_PROVIDER",
+          "value": "ScamShield_default_GoogleGmail"
+        },
+        {
+          "name": "SCAMSHIELD_SAFE_BROWSING_PROVIDER",
+          "value": "ScamShield_default_SafeBrowsing"
+        }
+      ],
+      "protocol": "MCP",
+      "authorizerType": "AWS_IAM"
+    },
+    {
+      "name": "ScamShieldAgent",
+      "description": "ScamShield investigator agent, invoked by EventBridge Scheduler",
+      "build": "CodeZip",
+      "entrypoint": "main.py",
+      "codeLocation": "../agent",
+      "runtimeVersion": "PYTHON_3_13",
+      "envVars": [
+        {
+          "name": "SCAMSHIELD_STORE",
+          "value": "dynamodb"
+        },
+        {
+          "name": "SCAMSHIELD_DYNAMODB_TABLE",
+          "value": "ScamShield"
+        },
+        {
+          "name": "SCAMSHIELD_MODEL_PROVIDER",
+          "value": "converse"
+        },
+        {
+          "name": "SCAMSHIELD_MODEL_ID",
+          "value": "us.anthropic.claude-opus-5-5"
+        },
+        {
+          "name": "SCAMSHIELD_EFFORT",
+          "value": "medium"
+        },
+        {
+          "name": "SCAMSHIELD_TOOL_PREFIX",
+          "value": "scamshield___"
+        },
+        {
+          "name": "SCAMSHIELD_GATEWAY_AUTH",
+          "value": "agentcore-m2m"
+        },
+        {
+          "name": "SCAMSHIELD_GATEWAY_SCOPES",
+          "value": "scamshield-gateway/invoke"
+        }
+      ],
+      "protocol": "HTTP",
+      "authorizerType": "AWS_IAM"
+    }
+  ],
+  "memories": [],
+  "knowledgeBases": [],
+  "credentials": [],
+  "evaluators": [],
+  "onlineEvalConfigs": [],
+  "agentCoreGateways": [
+    {
+      "name": "ScamShieldGateway",
+      "protocolType": "MCP",
+      "description": "ScamShield tool gateway: one MCP target (ScamShieldMcp), Cedar policy at the edge",
+      "targets": [],
+      "authorizerType": "CUSTOM_JWT",
+      "authorizerConfiguration": {
+        "customJwtAuthorizer": {
+          "discoveryUrl": "https://cognito-idp.us-east-1.amazonaws.com/CHANGE_ME_POOL_ID/.well-known/openid-configuration",
+          "allowedClients": [
+            "CHANGE_ME_GATEWAY_CLIENT_ID"
+          ]
+        }
+      },
+      "enableSemanticSearch": false,
+      "exceptionLevel": "NONE",
+      "policyEngineConfiguration": {
+        "policyEngineName": "ScamShieldPolicy",
+        "mode": "LOG_ONLY"
+      }
+    }
+  ],
+  "policyEngines": [
+    {
+      "name": "ScamShieldPolicy",
+      "description": "ScamShield guardrails: Cedar rules for the gateway's tools",
+      "policies": []
+    }
+  ],
+  "configBundles": [],
+  "harnesses": []
+}

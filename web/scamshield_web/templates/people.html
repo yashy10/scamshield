@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}People ScamShield protects{% endblock %}
+{% block content %}
+<section class="sheet">
+  <h1>People ScamShield protects</h1>
+  {% if not invites %}
+    <p>No one yet. <a href="/signup">Set it up for someone</a>.</p>
+  {% else %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th scope="col">Person</th><th scope="col">Gmail</th><th scope="col">Guardian</th><th scope="col">Status</th><th scope="col"><span class="visually-hidden">Scan</span></th></tr>
+      </thead>
+      <tbody>
+      {% for invite in invites %}
+        {% set state = scans.get(invite.user_id) %}
+        <tr>
+          <td>{{ invite.protected_name }}</td>
+          <td>{{ invite.connected_email or "Not connected" }}</td>
+          <td>{{ invite.guardian_name }}<br><span class="hint">{{ invite.guardian_email }}</span></td>
+          <td>
+            {% if invite.connected_at %}<span class="ok">Connected</span>
+            {% else %}Waiting for them to connect<br><a href="/invite/{{ invite.token }}">Invite link</a>{% endif %}
+          </td>
+          <td>
+            {% if invite.connected_at %}
+              {% if state and state.status == "running" %}<span class="hint">Scanning…</span>
+              {% else %}
+              <form method="post" action="/people/{{ invite.user_id }}/scan"><button class="button small" type="submit">Scan now</button></form>
+              {% endif %}
+            {% endif %}
+          </td>
+        </tr>
+        {% if state and state.status in ("done", "started", "error") %}
+        <tr class="result">
+          <td colspan="5">
+            {% if state.status == "done" %}
+              <p class="hint">Latest scan, {{ state.tool_calls }} checks:</p>
+              <div class="summary">{{ state.summary }}</div>
+            {% elif state.status == "started" %}
+              <p>{{ state.summary }}</p>
+            {% else %}
+              <p class="error">The scan didn’t finish: {{ state.error }}</p>
+            {% endif %}
+          </td>
+        </tr>
+        {% endif %}
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p><a href="/signup">Set it up for someone else</a></p>
+  {% endif %}
+  <p class="quiet">Scan now runs the local agent, so start the MCP server first, or set SCAMSHIELD_AGENT_ARN to use the deployed one.</p>
+</section>
+{% endblock %}

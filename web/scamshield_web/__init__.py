@@ -1,0 +1,1 @@
+"""ScamShield sign-up site."""
