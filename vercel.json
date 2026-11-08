@@ -3,7 +3,7 @@
   "functions": {
     "app.py": {
       "maxDuration": 60,
-      "excludeFiles": "{agent/**,infra/**,deploy/**,demo/**,**/tests/**,mcp_server/scripts/**,**/.venv/**,**/uv.lock,**/*.md,.local/**}"
+      "excludeFiles": "{agent/**,infra/**,deploy/**,demo/**,**/tests/**,mcp_server/scripts/**,web/scripts/**,**/.venv/**,**/uv.lock,**/*.md,.local/**}"
     }
   }
 }

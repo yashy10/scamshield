@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}ScamShield{% endblock %}</title>
+  <meta name="description" content="ScamShield checks the links in your parents’ Gmail and warns them, and you, about scam emails.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;800&display=swap" rel="stylesheet">
@@ -11,12 +12,27 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='7' width='28' height='18' rx='3' fill='%232348a0'/%3E%3Cpath d='M3 9l13 9 13-9' fill='none' stroke='white' stroke-width='2.5'/%3E%3C/svg%3E">
   {% if refresh %}<meta http-equiv="refresh" content="3">{% endif %}
 </head>
-<body>
+<body class="{% block body_class %}narrow{% endblock %}">
+  <a class="skip" href="#main">Skip to the main content</a>
   <header class="masthead">
-    <a class="brand" href="/">ScamShield</a>
+    <div class="masthead-inner">
+      <a class="brand" href="/">
+        <svg class="brand-mark" viewBox="0 0 32 24" aria-hidden="true"><rect x="1" y="1" width="30" height="22" rx="3" fill="#2348a0"/><path d="M3 4l13 9.5L29 4" fill="none" stroke="#fff" stroke-width="2.6" stroke-linejoin="round"/></svg>
+        ScamShield
+      </a>
+      <nav class="account-nav" aria-label="Account">
+        {% if account %}
+          <a class="nav-link" href="/dashboard">Dashboard</a>
+          <form method="post" action="/signout"><button class="button small secondary" type="submit">Sign out</button></form>
+        {% else %}
+          <a class="button small secondary" href="/signin">Sign in</a>
+        {% endif %}
+      </nav>
+    </div>
   </header>
-  <main class="page">
+  <main id="main" class="{% block main_class %}page{% endblock %}">
     {% block content %}{% endblock %}
   </main>
+  {% block footer %}{% endblock %}
 </body>
 </html>

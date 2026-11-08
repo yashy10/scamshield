@@ -79,7 +79,7 @@ def sign_up(client) -> str:
 
 def test_home_and_signup_validation(tmp_path):
     client, *_ = make_client(tmp_path)
-    assert "Set it up for someone" in client.get("/").text
+    assert "Protect someone" in client.get("/").text
     resp = client.post("/signup", data={"guardian_name": "", "guardian_email": "nope", "protected_name": ""})
     assert resp.status_code == 400
     for msg in ("Enter your name.", "Enter an email address", "Enter their first name.", "once they"):
@@ -126,11 +126,16 @@ def test_consent_callback_must_match_this_browser(tmp_path):
     token = sign_up(client)
     client.post(f"/join/{token}/connect")
     wrong = client.get("/", params={"code": "c", "state": "someone-elses-state"})
-    assert wrong.status_code == 400 and "doesn’t match" in wrong.text
+    assert wrong.status_code == 303
+    assert wrong.headers["location"] == f"/connect/problem?error=not_connected&token={token}"
     assert store.get_invite(token).connected_at is None
+    problem = client.get(wrong.headers["location"]).text
+    assert "Gmail isn’t connected yet" in problem and f'href="/join/{token}"' in problem
 
     stranger = TestClient(client.app, follow_redirects=False)  # no session cookie at all
-    assert "Start again" in stranger.get("/", params={"code": "c", "state": "state-123"}).text
+    restart = stranger.get("/", params={"code": "c", "state": "state-123"})
+    assert restart.headers["location"] == "/connect/problem?error=restart"
+    assert "Start again" in stranger.get(restart.headers["location"]).text
 
 
 def test_cancelled_google_sign_in(tmp_path):
@@ -138,13 +143,15 @@ def test_cancelled_google_sign_in(tmp_path):
     token = sign_up(client)
     client.post(f"/join/{token}/connect")
     resp = client.get("/", params={"error": "access_denied", "state": "state-123"})
-    assert "cancelled" in resp.text and store.get_invite(token).connected_at is None
+    assert resp.headers["location"] == f"/connect/problem?error=not_connected&token={token}"
+    assert "cancelled" in client.get(resp.headers["location"]).text and store.get_invite(token).connected_at is None
 
 
 def test_bad_invite_links(tmp_path):
     client, *_ = make_client(tmp_path)
     assert client.get("/join/not-a-real-token").status_code == 404
     assert client.get("/join/../../etc").status_code == 404
+    assert client.post("/join/not-a-real-token/connect").headers["location"] == "/connect/problem?error=bad_invite"
     assert client.post("/people/nobody/scan").status_code == 303  # unknown users are ignored
 
 
@@ -153,7 +160,8 @@ def test_missing_google_client_file_is_explained(tmp_path):
     (settings.secrets_dir / "google_oauth_client.json").unlink()
     token = sign_up(client)
     resp = client.post(f"/join/{token}/connect")
-    assert resp.status_code == 503 and "google_oauth_client.json" in resp.text
+    assert resp.headers["location"] == f"/connect/problem?error=unavailable&token={token}"
+    assert "can’t be connected right now" in client.get(resp.headers["location"]).text
 
 
 def test_full_signup_agentcore_identity(tmp_path):
@@ -203,7 +211,8 @@ def test_identity_callback_for_another_session_is_refused(tmp_path):
         stub.add_response("get_resource_oauth2_token", {"authorizationUrl": "https://g/x", "sessionUri": "urn:session:mine"})
         client.post(f"/join/{token}/connect")
         resp = client.get("/connect/callback", params={"session_id": "urn:session:someone-else"})
-        assert resp.status_code == 400 and store.get_invite(token).connected_at is None
+        assert resp.headers["location"] == f"/connect/problem?error=not_connected&token={token}"
+        assert store.get_invite(token).connected_at is None
 
 
 def test_people_page_password(tmp_path, monkeypatch):

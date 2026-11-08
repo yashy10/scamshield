@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Your dashboard | ScamShield{% endblock %}
+{% block content %}
+<section class="envelope">
+  {% if waiting %}
+  <h1>Almost there</h1>
+  {% for invite in waiting %}
+  <p>{{ invite.protected_name }} hasn’t connected their Gmail yet. Their dashboard appears here once they do.</p>
+  <div class="linkbox">
+    <input type="text" readonly value="{{ base_url }}/join/{{ invite.token }}" aria-label="{{ invite.protected_name }}’s invite link">
+    <a class="button secondary" href="/invite/{{ invite.token }}">Open invite</a>
+  </div>
+  {% endfor %}
+  {% else %}
+  <h1>No one is protected with this account yet</h1>
+  <p>You’re signed in as {{ account.email }}. ScamShield shows a dashboard to the person whose Gmail it checks, and to the family member who set it up.</p>
+  <a class="button" href="/signup">Protect someone</a>
+  <form method="post" action="/signout" class="quiet">
+    Used a different email when you set it up?
+    <button class="link-button" type="submit">Sign out and use that one</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

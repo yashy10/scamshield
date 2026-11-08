@@ -1,8 +1,13 @@
-"""ScamShield sign-up site.
+"""ScamShield site: landing page, sign-up, Google sign-in and the dashboard.
 
 A guardian signs up and gets an invite link; the protected person opens it, reads what ScamShield
-does and never does, and connects Gmail on Google's own consent screen. A people page shows who is
-protected and has the demo's "Scan now" button.
+does and never does, and connects Gmail on Google's own consent screen. Either of them can then sign
+in with Google to see the dashboard. A people page shows who is protected and has the demo's
+"Scan now" button.
+
+The Next.js frontend (frontend/) is the main UI: it uses the JSON API in api.py and sends the browser
+here for the sign-in and Gmail-consent redirects, which report problems as /signin?error=<code> and
+/connect/problem?error=<code>. These Jinja pages remain as a standalone fallback and the admin page.
 
 Run: cd web && uv run python app.py   (http://localhost:8080)
 Vercel: the repo-root app.py wraps this app; see README "Hosting the sign-up site on Vercel".
@@ -13,9 +18,10 @@ from __future__ import annotations
 import base64
 import logging
 import os
-import re
 import secrets
+from datetime import date
 from pathlib import Path
+from urllib.parse import urlencode
 
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
@@ -32,12 +38,30 @@ from scamshield.gmail import GmailClient, GmailError
 from scamshield.onboarding import ConsentError, complete_signup, make_consent
 from scamshield.store import Invite, Store, make_store
 
+from .api import api_routes
+from .auth import CALLBACK_PATH, SIGNIN_MESSAGES, Account, GoogleSignIn, SignInError, load_google_client
 from .aws import OidcTokenMiddleware, configure_aws
+from .dashboard import COLORS, PERIODS, ago, day, inbox_view, period_phrase, visible_to, warned_to, when
+from .forms import EMAIL_RE, TOKEN_RE, create_invite, validate_signup
 from .scans import ScanRunner
 
 log = logging.getLogger("scamshield.web")
 HERE = Path(__file__).resolve().parent
-EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+SESSION_COOKIE = "scamshield_session"
+
+# Gmail-connection problems, by the code in /connect/problem?error=<code>.
+CONNECT_PROBLEMS = {
+    "restart": ("Start again from your invite link",
+                ("This connection didn’t start in this browser, or it expired. Open your invite link and choose "
+                 "Connect my Gmail again.")),
+    "bad_invite": ("That invite link doesn’t work", "Ask the person who sent it for a new invite link."),
+    "not_connected": ("Gmail isn’t connected yet",
+                      ("Google sign-in was cancelled, or it didn’t finish in this browser. Open your invite link "
+                       "to try again.")),
+    "failed": ("Gmail isn’t connected yet", "Google didn’t finish the connection. Open your invite link to try again."),
+    "unavailable": ("Gmail can’t be connected right now",
+                    "Something on our side isn’t ready. Try again in a few minutes."),
+}
 
 
 def _default_base_url() -> str:
@@ -51,7 +75,8 @@ def _default_base_url() -> str:
 class SiteConfig:
     def __init__(self, settings: Settings | None = None, store: Store | None = None, base_url: str | None = None,
                  consent_kwargs: dict | None = None, gmail_factory=GmailClient, scans: ScanRunner | None = None,
-                 admin_password: str | None = None, on_vercel: bool | None = None) -> None:
+                 admin_password: str | None = None, on_vercel: bool | None = None,
+                 sign_in: GoogleSignIn | None = None, dev_sign_in: bool | None = None) -> None:
         self.settings = settings or get_settings()
         self.on_vercel = os.environ.get("VERCEL") == "1" if on_vercel is None else on_vercel
         if store is None:
@@ -66,22 +91,31 @@ class SiteConfig:
                                          detached=self.on_vercel)
         self.sender = self.settings.ses_from_address
         self.admin_password = admin_password if admin_password is not None else os.environ.get("SCAMSHIELD_ADMIN_PASSWORD")
+        if sign_in is None and (client := load_google_client(self.settings.secrets_dir)):
+            sign_in = GoogleSignIn(*client, redirect_uri=f"{self.base_url}{CALLBACK_PATH}")
+        self.sign_in = sign_in
+        # Local preview only: sign in as any address without Google. Never on Vercel or a public URL.
+        wanted = os.environ.get("SCAMSHIELD_DEV_SIGNIN") == "1" if dev_sign_in is None else dev_sign_in
+        local = self.base_url.startswith(("http://localhost", "http://127.0.0.1"))
+        self.dev_sign_in = wanted and local and not self.on_vercel
 
     def consent(self):
         return make_consent(self.settings, self.base_url, **self.consent_kwargs)
-
-
-def _slug(name: str) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:30]
-    return f"{slug or 'user'}-{secrets.token_hex(2)}"
 
 
 def create_app(config: SiteConfig | None = None) -> Starlette:
     cfg = config or SiteConfig()
     templates = Jinja2Templates(directory=str(HERE / "templates"))
 
+    templates.env.globals.update(colors=COLORS, ago=ago, day=day, when=when, warned_to=warned_to,
+                                 period_phrase=period_phrase)
+
+    def account_of(request: Request) -> Account | None:
+        return Account.from_session(request.session.get("account"))
+
     def render(request: Request, name: str, status_code: int = 200, **ctx) -> Response:
-        return templates.TemplateResponse(request, name, {"sender": cfg.sender, **ctx}, status_code=status_code)
+        ctx = {"sender": cfg.sender, "account": account_of(request), **ctx}
+        return templates.TemplateResponse(request, name, ctx, status_code=status_code)
 
     def message(request: Request, title: str, body: str, status_code: int = 400) -> Response:
         return render(request, "message.html", status_code=status_code, title=title, body=body)
@@ -103,7 +137,11 @@ def create_app(config: SiteConfig | None = None) -> Starlette:
                         headers={"WWW-Authenticate": 'Basic realm="ScamShield people"'})
 
     def invite_or_none(token: str) -> Invite | None:
-        return cfg.store.get_invite(token) if re.fullmatch(r"[A-Za-z0-9_-]{8,64}", token or "") else None
+        return cfg.store.get_invite(token) if TOKEN_RE.fullmatch(token or "") else None
+
+    def problem(code: str, token: str | None = None) -> Response:
+        query = {"error": code, **({"token": token} if token else {})}
+        return RedirectResponse(f"/connect/problem?{urlencode(query)}", status_code=303)
 
     # ------------------------------------------------------------------ pages
 
@@ -111,32 +149,18 @@ def create_app(config: SiteConfig | None = None) -> Starlette:
         # Local consent returns to the site root, like Google's desktop-app loopback flow.
         if "code" in request.query_params or "error" in request.query_params:
             return await _finish_consent(request, dict(request.query_params))
-        return render(request, "home.html")
+        return render(request, "home.html", today=date.today())
 
     async def signup(request: Request) -> Response:
         if request.method == "GET":
             return render(request, "signup.html", form={}, errors={})
         form = await request.form()
-        data = {k: str(form.get(k, "")).strip() for k in ("guardian_name", "guardian_email", "protected_name")}
-        errors = {}
-        if not 1 <= len(data["guardian_name"]) <= 60:
-            errors["guardian_name"] = "Enter your name."
-        if not EMAIL_RE.fullmatch(data["guardian_email"]):
-            errors["guardian_email"] = "Enter an email address like name@example.com."
-        if not 1 <= len(data["protected_name"]) <= 40:
-            errors["protected_name"] = "Enter their first name."
-        if form.get("agreed") != "yes":
-            errors["agreed"] = "Check this box once they’ve agreed. ScamShield only protects people who want it."
+        data, errors = validate_signup(*(str(form.get(k, "")) for k in ("guardian_name", "guardian_email",
+                                                                        "protected_name")),
+                                       agreed=form.get("agreed") == "yes")
         if errors:
             return render(request, "signup.html", status_code=400, form=data, errors=errors)
-        invite = Invite(
-            token=secrets.token_urlsafe(18),
-            user_id=_slug(data["protected_name"]),
-            protected_name=data["protected_name"],
-            guardian_name=data["guardian_name"],
-            guardian_email=data["guardian_email"].lower(),
-        )
-        cfg.store.put_invite(invite)
+        invite = create_invite(cfg.store, data)
         log.info("invite created user=%s", invite.user_id)
         return RedirectResponse(f"/invite/{invite.token}", status_code=303)
 
@@ -157,12 +181,15 @@ def create_app(config: SiteConfig | None = None) -> Starlette:
 
     async def connect(request: Request) -> Response:
         invite = invite_or_none(request.path_params["token"])
-        if not invite or invite.connected_at:
-            return RedirectResponse(f"/join/{request.path_params['token']}", status_code=303)
+        if not invite:
+            return problem("bad_invite")
+        if invite.connected_at:
+            return RedirectResponse(f"/protected/{invite.token}", status_code=303)
         try:
             start = cfg.consent().start(invite.user_id)
         except (ConsentError, CredentialError) as exc:
-            return message(request, "Gmail can’t be connected right now", str(exc), 503)
+            log.warning("connect could not start user=%s: %s", invite.user_id, exc)
+            return problem("unavailable", invite.token)
         request.session["consent"] = {"token": invite.token, "user_id": invite.user_id, **start.state}
         if start.authorization_url is None:  # Identity already holds a token for this user
             return await _finish_consent(request, {})
@@ -174,24 +201,30 @@ def create_app(config: SiteConfig | None = None) -> Starlette:
     async def _finish_consent(request: Request, params: dict) -> Response:
         saved = request.session.pop("consent", None)
         if not saved:
-            return message(request, "Start again from your invite link",
-                           "This sign-in didn’t start in this browser, or it expired. Open your invite link and "
-                           "choose Connect my Gmail again.")
+            return problem("restart")
         invite = invite_or_none(saved["token"])
         if not invite:
-            return message(request, "That invite link doesn’t work", "Ask for a new invite link.", 404)
+            return problem("bad_invite")
         try:
             token = cfg.consent().finish(saved["user_id"], saved, params)
             gmail_address = cfg.gmail_factory(token).profile_email()
         except ConsentError as exc:
-            return message(request, "Gmail isn’t connected yet", f"{exc} Open your invite link to try again.")
+            log.info("connect not finished user=%s: %s", saved["user_id"], exc)
+            return problem("not_connected", invite.token)
         except (CredentialError, GmailError) as exc:
             log.warning("connect failed user=%s: %s", saved["user_id"], exc)
-            return message(request, "Gmail isn’t connected yet",
-                           "Google didn’t finish the connection. Open your invite link to try again.", 502)
+            return problem("failed", invite.token)
         complete_signup(cfg.store, invite, gmail_address)
+        request.session["account"] = Account(gmail_address.lower(), invite.protected_name).to_session()
         log.info("connected user=%s", invite.user_id)
         return RedirectResponse(f"/protected/{invite.token}", status_code=303)
+
+    async def connect_problem(request: Request) -> Response:
+        code = request.query_params.get("error", "")
+        token = request.query_params.get("token", "")
+        title, body = CONNECT_PROBLEMS.get(code, ("Gmail isn’t connected yet", "Open your invite link to try again."))
+        link = f"/join/{token}" if TOKEN_RE.fullmatch(token) else None
+        return render(request, "message.html", title=title, body=body, link=link, link_text="Open the invite again")
 
     async def protected(request: Request) -> Response:
         invite = invite_or_none(request.path_params["token"])
@@ -215,6 +248,64 @@ def create_app(config: SiteConfig | None = None) -> Starlette:
             cfg.scans.start(user_id)
         return RedirectResponse("/people", status_code=303)
 
+    # ------------------------------------------------------------------ sign-in and dashboard
+
+    async def signin(request: Request) -> Response:
+        if account_of(request):
+            return RedirectResponse("/dashboard", status_code=303)
+        return render(request, "signin.html", google=cfg.sign_in is not None, dev=cfg.dev_sign_in,
+                      error=SIGNIN_MESSAGES.get(request.query_params.get("error", "")))
+
+    def signin_problem(code: str) -> Response:
+        return RedirectResponse(f"/signin?{urlencode({'error': code})}", status_code=303)
+
+    async def signin_google(request: Request) -> Response:
+        if not cfg.sign_in:
+            return signin_problem("not_configured")
+        start = cfg.sign_in.start()
+        request.session["signin"] = start.state
+        return RedirectResponse(start.url, status_code=303)
+
+    async def signin_callback(request: Request) -> Response:
+        saved = request.session.pop("signin", None)
+        if not cfg.sign_in:
+            return signin_problem("not_configured")
+        try:
+            account = cfg.sign_in.finish(saved, dict(request.query_params))
+        except SignInError as exc:
+            log.info("sign-in refused: %s", exc.code)
+            return signin_problem(exc.code)
+        request.session["account"] = account.to_session()
+        log.info("signed in")
+        return RedirectResponse("/dashboard", status_code=303)
+
+    async def signin_dev(request: Request) -> Response:
+        if not cfg.dev_sign_in:
+            return message(request, "Page not found", "There’s nothing here.", 404)
+        form = await request.form()
+        email = str(form.get("email", "")).strip().lower()
+        if not EMAIL_RE.fullmatch(email):
+            return signin_problem("bad_email")
+        request.session["account"] = Account(email, "").to_session()
+        return RedirectResponse("/dashboard", status_code=303)
+
+    async def signout(request: Request) -> Response:
+        request.session.clear()
+        return RedirectResponse("/", status_code=303)
+
+    async def dashboard(request: Request) -> Response:
+        account = account_of(request)
+        if not account:
+            return RedirectResponse("/signin", status_code=303)
+        visible = visible_to(cfg.store, account.email)
+        if not visible.people:
+            return render(request, "dashboard_empty.html", waiting=visible.waiting, base_url=cfg.base_url)
+        wanted = request.query_params.get("person")
+        person = next((p for p in visible.people if p.profile.user_id == wanted), visible.people[0])
+        view = inbox_view(cfg.store, person, request.query_params.get("period", ""))
+        return render(request, "dashboard.html", view=view, people=visible.people, waiting=visible.waiting,
+                      periods=PERIODS, base_url=cfg.base_url)
+
     secret = os.environ.get("SCAMSHIELD_WEB_SECRET")
     if not secret:
         if cfg.on_vercel:  # several instances must share one signing key, or sign-ins break between them
@@ -228,14 +319,24 @@ def create_app(config: SiteConfig | None = None) -> Starlette:
             Route("/join/{token}", join),
             Route("/join/{token}/connect", connect, methods=["POST"]),
             Route("/connect/callback", identity_callback),
+            Route("/connect/problem", connect_problem),
             Route("/protected/{token}", protected),
             Route("/people", people),
             Route("/people/{user_id}/scan", scan, methods=["POST"]),
+            Route("/signin", signin),
+            Route("/signin/google", signin_google, methods=["POST"]),
+            Route(CALLBACK_PATH, signin_callback),
+            Route("/signin/dev", signin_dev, methods=["POST"]),
+            Route("/signout", signout, methods=["POST"]),
+            Route("/dashboard", dashboard),
+            *api_routes(cfg),
             Mount("/static", StaticFiles(directory=str(HERE / "static")), name="static"),
         ],
         middleware=[
             Middleware(OidcTokenMiddleware),
-            Middleware(SessionMiddleware, secret_key=secret, same_site="lax", max_age=3600,
-                       https_only=cfg.base_url.startswith("https://")),
+            # A name of our own: cookies on localhost are shared across ports, and a generic "session" from
+            # another local app would shadow ours.
+            Middleware(SessionMiddleware, secret_key=secret, session_cookie=SESSION_COOKIE, same_site="lax",
+                       max_age=8 * 3600, https_only=cfg.base_url.startswith("https://")),
         ],
     )

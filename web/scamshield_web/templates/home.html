@@ -1,29 +1,147 @@
 {% extends "base.html" %}
+{% block title %}ScamShield: a second look at every email your parents get{% endblock %}
+{% block body_class %}wide{% endblock %}
+{% block main_class %}landing{% endblock %}
 {% block content %}
-<section class="envelope">
-  <h1>Help someone you love spot scam emails</h1>
-  <p class="lead">ScamShield checks the links in new emails against real evidence. When one looks like a scam, it labels the email in Gmail and sends a plain warning to them, with you copied.</p>
-  <a class="button" href="/signup">Set it up for someone</a>
+
+<section class="hero">
+  <div class="hero-copy">
+    <h1>A second look at every email your parents get.</h1>
+    <p class="lead">ScamShield checks the links in new Gmail messages against real evidence: how old the website is, and whether Google lists it as dangerous. When an email is a scam, it gets labeled in Gmail and they get a plain warning, with you copied.</p>
+    <div class="hero-actions">
+      <a class="button big" href="/signup">Protect someone</a>
+      <a class="text-link" href="#how">How it works</a>
+    </div>
+    <p class="hero-note">Works with Gmail. Takes about five minutes to set up together.</p>
+  </div>
+
+  <figure class="exhibit" aria-labelledby="exhibit-caption">
+    <div class="mail envelope">
+      <dl class="mail-head">
+        <div><dt>From</dt><dd>Parcel Delivery &lt;notice@parcel-redelivery-help.com&gt;</dd></div>
+        <div><dt>Subject</dt><dd>Package on hold: action needed today</dd></div>
+      </dl>
+      <div class="mail-body">
+        <p>Dear customer,</p>
+        <p>We could not deliver your package. A $1.99 redelivery fee is due today or your package will be returned to the sender.</p>
+        <p><span class="bad-link">Pay the redelivery fee</span></p>
+      </div>
+      <svg class="postmark" viewBox="0 0 220 140" role="img" aria-label="Postmark: checked by ScamShield, scam">
+        <defs>
+          <path id="pm-top" d="M30,70 a40,40 0 0,1 80,0"/>
+          <path id="pm-bottom" d="M24,70 a46,46 0 0,0 92,0"/>
+        </defs>
+        <g class="postmark-ink">
+          <circle cx="70" cy="70" r="56" fill="none" stroke-width="3.5"/>
+          <circle cx="70" cy="70" r="49" fill="none" stroke-width="1.5"/>
+          <text class="pm-arc"><textPath href="#pm-top" startOffset="50%" text-anchor="middle">CHECKED</textPath></text>
+          <text class="pm-arc"><textPath href="#pm-bottom" startOffset="50%" text-anchor="middle">{{ today.strftime("%b").upper() }} {{ today.day }} {{ today.year }}</textPath></text>
+          <text class="pm-word" x="70" y="79" text-anchor="middle">SCAM</text>
+          <path class="pm-wave" d="M132 42 q11 -8 22 0 t22 0 t22 0 t22 0"/>
+          <path class="pm-wave" d="M132 58 q11 -8 22 0 t22 0 t22 0 t22 0"/>
+          <path class="pm-wave" d="M132 74 q11 -8 22 0 t22 0 t22 0 t22 0"/>
+          <path class="pm-wave" d="M132 90 q11 -8 22 0 t22 0 t22 0 t22 0"/>
+        </g>
+      </svg>
+    </div>
+    <figcaption id="exhibit-caption" class="findings">
+      <p class="findings-title">What ScamShield found</p>
+      <ul class="never">
+        <li>The link goes to a website registered 3 days ago.</li>
+        <li>Google Safe Browsing lists the link as phishing.</li>
+        <li>A delivery company wouldn’t send from this address.</li>
+      </ul>
+      <p class="findings-done">Labeled “ScamShield” in Gmail. Warning sent to Margaret, with a copy to Alex.</p>
+    </figcaption>
+  </figure>
 </section>
 
-<section class="two">
-  <div>
-    <h2>What it does</h2>
-    <ul class="does">
-      <li>Checks each link with Google Safe Browsing and looks up how new the website is.</li>
-      <li>Adds a “ScamShield” label to risky emails in Gmail.</li>
-      <li>Emails them a short warning and sends you a copy.</li>
+<section class="news" aria-labelledby="news-title">
+  <h2 id="news-title">Scam emails to older Americans have exploded</h2>
+  <div class="news-grid">
+    <figure class="chart" aria-labelledby="chart-title">
+      <figcaption>
+        <p class="chart-title" id="chart-title">Phishing complaints from people 60 and over</p>
+        <p class="chart-sub">Reports to the FBI each year. Phishing is now the crime older adults report most.</p>
+      </figcaption>
+      {% set bars = [("2023", 2856), ("2024", 23252), ("2025", 48064)] %}
+      <div class="columns" aria-hidden="true">
+        {% for year, value in bars %}
+        <div class="column" style="--f: {{ (value / 48064) | round(3) }}">
+          <span class="column-value">{{ "{:,}".format(value) }}</span>
+          <span class="column-bar"></span>
+          <span class="column-label">{{ year }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="visually-hidden">
+      <table>
+        <caption>Phishing complaints from people 60 and over, by year</caption>
+        <tr><th scope="col">Year</th><th scope="col">Complaints</th></tr>
+        {% for year, value in bars %}<tr><th scope="row">{{ year }}</th><td>{{ "{:,}".format(value) }}</td></tr>{% endfor %}
+      </table>
+      </div>
+      <p class="source">Source: <a href="https://www.ic3.gov/AnnualReport/Reports/2025_IC3Report.pdf">FBI Internet Crime Complaint Center, 2025 Internet Crime Report</a></p>
+    </figure>
+
+    <ul class="clippings">
+      <li>
+        <p class="clip-source">FBI Internet Crime Complaint Center <span class="clip-date">April 2026</span></p>
+        <a class="clip-head" href="https://www.ic3.gov/AnnualReport/Reports/2025_IC3Report.pdf">2025 Internet Crime Report</a>
+        <p>People 60 and over reported $7.7 billion in losses, up 59% from 2024. The average loss was $38,500.</p>
+      </li>
+      <li>
+        <p class="clip-source">AARP <span class="clip-date">April 16, 2026</span></p>
+        <a class="clip-head" href="https://www.aarp.org/money/scams-fraud/fbi-ftc-report-2025-losses.html">New FBI Report: $20.9 Billion Lost to Internet Crimes in 2025, Older Adults Hit Hardest</a>
+        <p>Americans 60 and older reported about 60 percent more in losses than the year before.</p>
+      </li>
+      <li>
+        <p class="clip-source">Federal Trade Commission <span class="clip-date">October 19, 2026</span></p>
+        <a class="clip-head" href="https://www.ftc.gov/node/338049">FTC Issues Annual Report to Congress on Agency’s Actions to Protect Older Adults</a>
+        <p>Fraud losses reported by older adults grew about fivefold, from about $600 million in 2020 to about $3 billion in 2025.</p>
+      </li>
     </ul>
   </div>
+</section>
+
+<section class="how" id="how" aria-labelledby="how-title">
+  <h2 id="how-title">How it works</h2>
+  <ol class="steps">
+    <li>
+      <h3>A new email arrives</h3>
+      <p>ScamShield looks at new messages in their Gmail inbox on a regular schedule. Emails without links are left alone.</p>
+    </li>
+    <li>
+      <h3>Every link gets checked</h3>
+      <p>It looks up how long each website has existed and asks Google Safe Browsing whether the link is known to be dangerous.</p>
+    </li>
+    <li>
+      <h3>Scams get labeled and explained</h3>
+      <p>Risky emails get a “ScamShield” label in Gmail, and they get a short warning that says why, in plain words. You get a copy.</p>
+    </li>
+  </ol>
+</section>
+
+<section class="promises" aria-labelledby="promises-title">
   <div>
-    <h2>What it never does</h2>
+    <h2 id="promises-title">What it never does</h2>
     <ul class="never">
       <li>Delete, move or send their email.</li>
       <li>Show you their emails. You see warnings only.</li>
       <li>Ask for their password. They sign in on Google’s own page.</li>
     </ul>
   </div>
+  <div class="closing">
+    <h2>Set it up together</h2>
+    <p>You fill in a short form and send them a link. They open it and connect their own Gmail. It takes about five minutes.</p>
+    <a class="button" href="/signup">Protect someone</a>
+    <p class="quiet">Already set up? <a href="/signin">Sign in</a> to see what ScamShield caught.</p>
+  </div>
 </section>
+{% endblock %}
 
-<p class="quiet"><a href="/people">See who’s protected</a></p>
+{% block footer %}
+<footer class="site-footer">
+  <p>ScamShield labels emails and sends warnings. It never deletes, moves or sends email.</p>
+</footer>
 {% endblock %}

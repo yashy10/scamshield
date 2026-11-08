@@ -3,9 +3,12 @@ agent/
 infra/
 deploy/
 demo/
+web/scripts/
 .local/
 .env
 *.pdf
 **/.venv/
 **/tests/
 **/node_modules/
+# The Next.js app (frontend/) deploys separately; this project serves the Python site.
+frontend/

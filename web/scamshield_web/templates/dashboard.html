@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% set p = view.person %}
+{% set own = p.role == "self" %}
+{% set whose = "Your" if own else p.name ~ "’s" %}
+{% set phrase = period_phrase(view.period) %}
+{% block title %}{{ whose }} inbox | ScamShield{% endblock %}
+{% block body_class %}wide{% endblock %}
+{% block main_class %}dash{% endblock %}
+
+{% macro plural(n, one, many) %}{{ n }} {{ one if n == 1 else many }}{% endmacro %}
+
+{% macro icon(kind) -%}
+<svg class="status-icon" viewBox="0 0 24 24" aria-hidden="true">
+  {%- if kind == "safe" -%}<path d="M5 12.5l4.5 4.5L19 7.5"/>
+  {%- elif kind == "careful" -%}<path d="M12 6v8"/><path d="M12 18.2v.1"/>
+  {%- elif kind == "scam" -%}<path d="M7 7l10 10M17 7L7 17"/>
+  {%- else -%}<path d="M12 7v5l3 2"/>{%- endif -%}
+</svg>
+{%- endmacro %}
+
+{% block content %}
+<div class="dash-top">
+  <div>
+    <h1 class="dash-title">{{ whose }} inbox</h1>
+    <p class="dash-who">{{ p.profile.email }}{% if not own %}. You’re {{ p.name }}’s family contact.{% endif %}</p>
+  </div>
+  <div class="dash-controls">
+    {% if people|length > 1 %}
+    <nav class="segmented" aria-label="Whose inbox">
+      {% for other in people %}
+      <a href="/dashboard?person={{ other.profile.user_id }}&amp;period={{ view.period }}"
+         {% if other.profile.user_id == p.profile.user_id %}aria-current="page"{% endif %}>{{ "You" if other.role == "self" else other.name }}</a>
+      {% endfor %}
+    </nav>
+    {% endif %}
+    <nav class="segmented" aria-label="Time period">
+      {% for key, (label, _) in periods.items() %}
+      <a href="/dashboard?person={{ p.profile.user_id }}&amp;period={{ key }}" {% if key == view.period %}aria-current="page"{% endif %}>{{ label }}</a>
+      {% endfor %}
+    </nav>
+  </div>
+</div>
+
+<section class="status envelope status-{{ view.status }}" aria-labelledby="status-head">
+  <div class="ring-wrap">
+    <svg class="ring" viewBox="0 0 240 240" aria-hidden="true">
+      <g transform="rotate(-90 120 120)">
+        {% for seg in view.segments %}
+        <circle class="seg seg-{{ seg.key }}" cx="120" cy="120" r="100" fill="none" stroke="{{ seg.color }}"
+                stroke-dasharray="{{ seg.dash | round(2) }} {{ (view.circumference - seg.dash) | round(2) }}"
+                stroke-dashoffset="{{ seg.offset | round(2) }}"><title>{{ seg.label }}: {{ seg.count }}</title></circle>
+        {% endfor %}
+      </g>
+    </svg>
+    <div class="ring-center">
+      <span class="ring-badge badge-{{ view.status }}">{{ icon(view.status) }}</span>
+      <p class="ring-word">
+        {%- if view.status == "scam" -%}{{ plural(view.scams | length, "scam", "scams") }} caught
+        {%- elif view.status == "careful" -%}Take care
+        {%- elif view.status == "safe" -%}All clear
+        {%- else -%}Not checked yet{%- endif -%}
+      </p>
+      <p class="ring-sub">{{ plural(view.checked, "email", "emails") }} checked</p>
+    </div>
+  </div>
+
+  <div class="status-copy">
+    <h2 class="status-head" id="status-head">
+      {%- if view.status == "scam" -%}
+        We caught {{ plural(view.scams | length, "scam email", "scam emails") }}{% if not own %} sent to {{ p.name }}{% endif %}
+      {%- elif view.status == "careful" -%}
+        {{ plural(view.suspicious | length, "email needs", "emails need") }} a careful look
+      {%- elif view.status == "safe" -%}
+        {{ whose }} inbox looks safe
+      {%- else -%}
+        Waiting for the first check
+      {%- endif -%}
+    </h2>
+    <p class="status-sub">
+      {%- if view.status == "scam" -%}
+        {{ phrase | capitalize }}. {{ "They’re" if view.scams | length > 1 else "It’s" }} labeled “ScamShield” in Gmail.
+        {% if own %}Don’t click {{ "their" if view.scams | length > 1 else "its" }} links or call any phone numbers in {{ "them" if view.scams | length > 1 else "it" }}.{% else %}{{ p.name }} was sent a warning.{% endif %}
+      {%- elif view.status == "careful" -%}
+        No scams {{ phrase }}, but something looked off. {% if own %}Ask someone you trust before you click.{% else %}{{ p.name }} was told to check before clicking.{% endif %}
+      {%- elif view.status == "safe" -%}
+        No scam emails found {{ phrase }}.
+      {%- else -%}
+        ScamShield hasn’t looked at this inbox yet. Results show up here after the first check.
+      {%- endif -%}
+    </p>
+
+    <dl class="legend">
+      {% for key, label, count in [("scam", "Scams caught", view.scams | length), ("suspicious", "Needed a careful look", view.suspicious | length), ("safe", "Looked safe", view.safe)] %}
+      <div class="legend-row">
+        <dt><span class="swatch" style="background: {{ colors[key] }}"></span>{{ label }}</dt>
+        <dd>{{ "{:,}".format(count) }}</dd>
+      </div>
+      {% endfor %}
+      <div class="legend-row legend-total">
+        <dt>Emails checked, {{ view.period_label | lower }}</dt>
+        <dd>{{ "{:,}".format(view.checked) }}</dd>
+      </div>
+    </dl>
+    <p class="status-meta">Last check {{ ago(view.last_checked) }}. {{ plural(view.warnings_sent, "warning", "warnings") }} sent {{ phrase }}.</p>
+  </div>
+</section>
+
+{% macro caught_list(records, kind) %}
+<ul class="caught">
+  {% for r in records %}
+  <li class="caught-item caught-{{ kind }}">
+    <div class="caught-main">
+      <p class="caught-from">
+        <span class="tag tag-{{ kind }}">{{ icon("scam" if kind == "scam" else "careful") }}{{ "Scam" if kind == "scam" else "Be careful" }}</span>
+        <strong>{{ r.sender_name or r.sender_domain or "Unknown sender" }}</strong>
+        {% if r.sender_domain and r.sender_name %}<span class="caught-domain">from {{ r.sender_domain }}</span>{% endif %}
+      </p>
+      {% if own and r.subject %}<p class="caught-subject">“{{ r.subject }}”</p>{% endif %}
+      {% if r.reasons %}
+      <ul class="reasons">{% for reason in r.reasons %}<li>{{ reason }}</li>{% endfor %}</ul>
+      {% endif %}
+      <p class="caught-done">
+        {% if r.labeled %}<span>Labeled “ScamShield” in Gmail</span>{% endif %}
+        {% set to = warned_to(r, p) %}{% if r.warned_at and to %}<span>Warning sent to {{ to }}</span>{% endif %}
+      </p>
+    </div>
+    <time class="caught-date" datetime="{{ when(r).isoformat() }}">{{ day(when(r)) }}</time>
+  </li>
+  {% endfor %}
+</ul>
+{% endmacro %}
+
+<div class="dash-grid">
+  <section class="dash-section" aria-labelledby="scams-title">
+    <h2 id="scams-title">Scam emails we caught</h2>
+    {% if view.scams %}
+      {% if not own %}<p class="section-note">You see who sent each one and why it was flagged, not the email itself.</p>{% endif %}
+      {{ caught_list(view.scams, "scam") }}
+    {% else %}
+      <p class="empty">No scam emails {{ phrase }}. When ScamShield catches one, it shows up here with the reasons.</p>
+    {% endif %}
+
+    {% if view.suspicious %}
+    <h2 id="careful-title">Emails that needed a careful look</h2>
+    <p class="section-note">Not clearly scams, but something about them looked off.</p>
+    {{ caught_list(view.suspicious, "suspicious") }}
+    {% endif %}
+  </section>
+
+  <aside class="dash-side" aria-labelledby="weeks-title">
+    <h2 id="weeks-title">Emails checked each week</h2>
+    {% set top = view.week_max or 1 %}
+    <div class="weeks">
+      {% for w in view.weeks %}
+      <div class="week" tabindex="0" aria-describedby="week-tip-{{ loop.index }}">
+        <span class="week-total">{{ w.total if w.total else "" }}</span>
+        <span class="week-stack" style="--f: {{ (w.total / top) | round(3) }}">
+          {% if w.scam %}<span style="flex-grow: {{ w.scam }}; background: {{ colors.scam }}"></span>{% endif %}
+          {% if w.suspicious %}<span style="flex-grow: {{ w.suspicious }}; background: {{ colors.suspicious }}"></span>{% endif %}
+          {% if w.safe %}<span style="flex-grow: {{ w.safe }}; background: {{ colors.safe }}"></span>{% endif %}
+        </span>
+        <span class="week-label">{{ w.start.strftime("%b") }} {{ w.start.day }}</span>
+        <span class="tip" role="tooltip" id="week-tip-{{ loop.index }}">
+          Week of {{ w.start.strftime("%b") }} {{ w.start.day }}: {{ w.total }} checked.
+          {{ w.scam }} scam, {{ w.suspicious }} careful look, {{ w.safe }} safe.
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+    <ul class="mini-legend">
+      <li><span class="swatch" style="background: {{ colors.scam }}"></span>Scam</li>
+      <li><span class="swatch" style="background: {{ colors.suspicious }}"></span>Careful look</li>
+      <li><span class="swatch" style="background: {{ colors.safe }}"></span>Safe</li>
+    </ul>
+
+    <h2>What ScamShield does</h2>
+    <ul class="does">
+      <li>Checks every link in new emails.</li>
+      <li>Labels risky emails “ScamShield” in Gmail.</li>
+      <li>Sends a plain warning{% if p.profile.guardian_email %}, with a copy to {{ "you" if not own else (p.profile.guardian_name or "your family contact") }}{% endif %}.</li>
+    </ul>
+    <p class="quiet">It never deletes, moves or sends email.</p>
+
+    {% if waiting %}
+    <h2>Waiting to connect</h2>
+    <ul class="waiting">
+      {% for invite in waiting %}
+      <li>{{ invite.protected_name }} hasn’t connected Gmail yet. <a href="/invite/{{ invite.token }}">Get their invite link</a></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}
