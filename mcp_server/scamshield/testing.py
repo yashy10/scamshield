@@ -112,6 +112,17 @@ class FakeSafeBrowsing:
         return ThreatResult(url=url, flagged=False)
 
 
+class AlertRecorder:
+    """Records "Scam blocked" alerts instead of sending them to Telegram."""
+
+    def __init__(self) -> None:
+        self.sent: list[dict] = []
+
+    def scam_blocked(self, *, protected_name: str | None, sender_domain: str | None) -> bool:
+        self.sent.append({"protected_name": protected_name, "sender_domain": sender_domain})
+        return True
+
+
 class OutboxSender:
     def __init__(self) -> None:
         self.sent: list[Message] = []
@@ -127,6 +138,7 @@ class FakeEnv:
     tokens: FakeTokens
     outbox: OutboxSender
     store: LocalStore
+    alerts: AlertRecorder
 
 
 def make_fake_env(tmp_path: Path) -> FakeEnv:
@@ -142,7 +154,7 @@ def make_fake_env(tmp_path: Path) -> FakeEnv:
             guardian_name="Alex",
         )
     )
-    gmail, tokens, outbox = FakeGmail(), FakeTokens(), OutboxSender()
+    gmail, tokens, outbox, alerts = FakeGmail(), FakeTokens(), OutboxSender(), AlertRecorder()
     services = Services(
         settings=settings,
         store=store,
@@ -152,11 +164,12 @@ def make_fake_env(tmp_path: Path) -> FakeEnv:
         sender=outbox,
         gmail_factory=lambda token: gmail,
         safebrowsing_factory=FakeSafeBrowsing,
+        alerts=alerts,
     )
-    return FakeEnv(services=services, gmail=gmail, tokens=tokens, outbox=outbox, store=store)
+    return FakeEnv(services=services, gmail=gmail, tokens=tokens, outbox=outbox, store=store, alerts=alerts)
 
 
-def fixture_services(settings, store, sender) -> Services:
+def fixture_services(settings, store, sender, alerts=None) -> Services:
     """Demo mode: a simulated inbox plus simulated RDAP and Safe Browsing, from a JSON file.
 
     The file holds {"profile_email", "domain_ages": {domain: days}, "flagged_urls": [...],
@@ -184,4 +197,5 @@ def fixture_services(settings, store, sender) -> Services:
         sender=sender,
         gmail_factory=lambda token: gmail,
         safebrowsing_factory=FixtureSafeBrowsing,
+        alerts=alerts,
     )

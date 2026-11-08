@@ -56,7 +56,7 @@ app.py, requirements.txt, vercel.json   Vercel entry for the sign-up site
 
 ```bash
 # Tests (no credentials needed)
-cd mcp_server && uv run pytest     # 50 tests
+cd mcp_server && uv run pytest     # 63 tests
 cd agent && uv run pytest          # 10 tests, full loop with a scripted model
 cd infra && uv run pytest          # 12 tests
 cd web && uv run pytest            # 8 tests, sign-up flow with Google/Identity faked
@@ -74,6 +74,23 @@ cd agent && uv run python -m scamshield_agent --user-id grandma
 ```
 
 Phases 3 to 5 deploy steps: `deploy/README.md` (AgentCore CLI) and `infra/README.md` (CDK).
+
+### Telegram alerts
+
+Each time ScamShield labels an email as a **scam**, the MCP server sends "🛡️ Scam blocked successfully" to one
+Telegram chat, with the person's name, the sender's domain (defanged) and a link to
+https://scamshield-lac-two.vercel.app/. It never includes the email's subject or body. One alert per email (a
+retried `label_email` doesn't repeat it); suspicious emails don't alert. Alerts are best effort: if Telegram is
+down, the scan carries on and the failure is logged.
+
+```bash
+# 1. In Telegram: message @BotFather, send /newbot, copy the token.
+# 2. Open the new bot and press Start (or add it to a group and send a message there).
+cd mcp_server && uv run scripts/connect_telegram.py   # asks for the token, finds the chat, sends a test alert,
+                                                      # saves TELEGRAM_BOT_TOKEN + SCAMSHIELD_TELEGRAM_CHAT_ID to .env
+```
+
+Restart the MCP server afterwards. For the deployed server, see "Telegram alerts" in `deploy/README.md`.
 
 **The sign-up site** uses the same switch as the MCP server. With `SCAMSHIELD_CREDENTIALS=local` (default) Google
 returns to `http://localhost:8080/` and the token is saved in `.local/secrets/`. That works with the Desktop OAuth

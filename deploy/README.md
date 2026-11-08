@@ -80,6 +80,18 @@ The hackathon organization's SCP denies AgentCore and `bedrock-mantle` in us-wes
     workload identity) plus read access to its Secrets Manager secret.
 - The sign-up site runs on Vercel (see the root README); users connect Gmail there.
 
+### Telegram alerts (optional)
+
+The MCP runtime can post "Scam blocked successfully" to a Telegram chat (root README, "Telegram alerts"). Keep the
+bot token in AgentCore Identity rather than in an env var:
+```bash
+cd mcp_server && uv run scripts/connect_telegram.py --identity-provider scamshield-telegram
+```
+That creates (or updates) the API-key provider `scamshield-telegram`, sends a test alert, and prints the chat id.
+Then add two env vars to `ScamShieldMcp` in `agentcore.json`: `SCAMSHIELD_TELEGRAM_PROVIDER=scamshield-telegram` and
+`SCAMSHIELD_TELEGRAM_CHAT_ID=<chat id>`. The runtime role already has `GetResourceApiKey` on the token vault (infra's
+`ScamShieldMcpServerAccess`), and the runtime needs outbound internet for `api.telegram.org`, as it does for Google.
+
 So in the runbook below: skip the `GoogleGmail` credential in step 4, the Google redirect-URI lookup in step 7,
 setting `SCAMSHIELD_WORKLOAD_NAME` in step 8, and the Gmail connection in step 10. `SCAMSHIELD_GOOGLE_PROVIDER`
 is already `scamshield-google`. After the agent runtime exists, set its ARN on Vercel (`SCAMSHIELD_AGENT_ARN`) so

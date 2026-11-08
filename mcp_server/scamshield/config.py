@@ -68,6 +68,13 @@ class Settings:
     max_links_per_email: int
     snippet_chars: int
 
+    # Telegram "Scam blocked" alerts to one chat; off unless a chat id is set. The bot token comes from
+    # TELEGRAM_BOT_TOKEN, or from an AgentCore Identity API-key provider when telegram_provider_name is set.
+    telegram_chat_id: str | None
+    telegram_bot_token: str | None
+    telegram_provider_name: str | None
+    telegram_link: str
+
     label_name: str
     # Defense in depth: the tool also refuses recipients that are not the user or
     # their guardian. AgentCore Policy enforces the same rule at the Gateway.
@@ -102,6 +109,10 @@ def get_settings() -> Settings:
         max_emails_per_scan=_env_int("SCAMSHIELD_MAX_EMAILS", 10),
         max_links_per_email=_env_int("SCAMSHIELD_MAX_LINKS", 10),
         snippet_chars=_env_int("SCAMSHIELD_SNIPPET_CHARS", 400),
+        telegram_chat_id=os.environ.get("SCAMSHIELD_TELEGRAM_CHAT_ID") or None,
+        telegram_bot_token=os.environ.get("TELEGRAM_BOT_TOKEN") or None,
+        telegram_provider_name=os.environ.get("SCAMSHIELD_TELEGRAM_PROVIDER") or None,
+        telegram_link=os.environ.get("SCAMSHIELD_TELEGRAM_LINK") or "https://scamshield-lac-two.vercel.app/",
         label_name=os.environ.get("SCAMSHIELD_LABEL", "ScamShield"),
         tool_recipient_check=_env_bool("SCAMSHIELD_TOOL_RECIPIENT_CHECK", True),
         # Bind to localhost by default; set SCAMSHIELD_HOST=0.0.0.0 inside AgentCore Runtime.

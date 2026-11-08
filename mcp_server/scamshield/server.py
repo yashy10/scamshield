@@ -38,6 +38,7 @@ from .rdap import DomainAge, RdapClient
 from .redact import redact
 from .safebrowsing import SafeBrowsingClient, SafeBrowsingError, ThreatResult
 from .store import EmailRecord, Store, make_store, now_iso
+from .telegram import ScamAlerts, TelegramAlerts
 
 log = logging.getLogger("scamshield")
 
@@ -55,6 +56,8 @@ class Services:
     sender: EmailSender
     gmail_factory: Callable[[str], GmailClient] = field(default=GmailClient)
     safebrowsing_factory: Callable[[str], SafeBrowsingClient] = field(default=SafeBrowsingClient)
+    # "Scam blocked" alerts (Telegram); None when not configured.
+    alerts: ScamAlerts | None = None
 
 
 _services: Services | None = None
@@ -73,12 +76,31 @@ def make_credentials(s: Settings) -> tuple[GmailTokenProvider, ApiKeyProvider]:
     raise ValueError(f"Unknown SCAMSHIELD_CREDENTIALS: {s.credentials_backend!r}")
 
 
+def make_alerts(s: Settings) -> ScamAlerts | None:
+    """Telegram "Scam blocked" alerts, when SCAMSHIELD_TELEGRAM_CHAT_ID is set."""
+    if not s.telegram_chat_id:
+        return None
+    if s.telegram_provider_name:
+        if not s.workload_name:
+            raise ValueError("SCAMSHIELD_TELEGRAM_PROVIDER needs SCAMSHIELD_WORKLOAD_NAME (the workload identity).")
+        provider = AgentCoreApiKeyProvider(
+            s.workload_name, s.telegram_provider_name, s.aws_region, what="Telegram bot token"
+        )
+        return TelegramAlerts(provider.api_key, s.telegram_chat_id, s.telegram_link)
+    if s.telegram_bot_token:
+        token = s.telegram_bot_token
+        return TelegramAlerts(lambda: token, s.telegram_chat_id, s.telegram_link)
+    raise ValueError("SCAMSHIELD_TELEGRAM_CHAT_ID is set, but there is no TELEGRAM_BOT_TOKEN or SCAMSHIELD_TELEGRAM_PROVIDER.")
+
+
 def build_services(settings: Settings | None = None) -> Services:
     s = settings or get_settings()
     if s.gmail_backend == "fixture":
         from .testing import fixture_services  # demo mode: simulated inbox, RDAP and Safe Browsing
 
-        return fixture_services(s, make_store(s), make_sender(s.email_backend, s.ses_from_address, s.aws_region))
+        return fixture_services(
+            s, make_store(s), make_sender(s.email_backend, s.ses_from_address, s.aws_region), make_alerts(s)
+        )
     if s.gmail_backend != "api":
         raise ValueError(f"Unknown SCAMSHIELD_GMAIL: {s.gmail_backend!r}")
     gmail_tokens, api_keys = make_credentials(s)
@@ -89,6 +111,7 @@ def build_services(settings: Settings | None = None) -> Services:
         api_keys=api_keys,
         rdap=RdapClient(),
         sender=make_sender(s.email_backend, s.ses_from_address, s.aws_region),
+        alerts=make_alerts(s),
     )
 
 
@@ -320,6 +343,15 @@ def label_email(
         fields.update(_flagged_fields(gmail, uid, email_id))
     s.store.update_email(uid, email_id, fields)
     log.info("label_email user=%s email=%s verdict=%s labeled=%s", uid, email_id, verdict, labeled)
+
+    # One "Scam blocked" alert per email: a retried label_email doesn't send a second one.
+    already_blocked = bool(existing and existing.labeled and existing.verdict == "scam")
+    if verdict == "scam" and s.alerts and not already_blocked:
+        profile = s.store.get_user(uid)
+        s.alerts.scam_blocked(
+            protected_name=profile.display_name if profile else None,
+            sender_domain=fields.get("sender_domain") or (existing.sender_domain if existing else None),
+        )
     return LabelResult(ok=True, labeled=labeled, verdict=verdict)
 
 

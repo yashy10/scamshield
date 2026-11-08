@@ -165,20 +165,27 @@ class AgentCoreGmailTokenProvider:
 
 
 class AgentCoreApiKeyProvider:
-    """Phase 3: the Safe Browsing key comes from an AgentCore Identity API-key credential provider."""
+    """Phase 3: an API key from an AgentCore Identity API-key credential provider: the Safe Browsing key,
+    or the Telegram bot token (`what` names it in errors)."""
 
     _TTL = timedelta(minutes=10)
 
-    def __init__(self, workload_name: str, provider_name: str, region: str, client=None) -> None:
+    def __init__(
+        self, workload_name: str, provider_name: str, region: str, client=None, what: str = "Safe Browsing key"
+    ) -> None:
         import boto3
 
         self.workload_name = workload_name
         self.provider_name = provider_name
+        self.what = what
         self._client = client or boto3.client("bedrock-agentcore", region_name=region)
         self._cached: tuple[str, datetime] | None = None
         self._lock = threading.Lock()
 
     def safe_browsing_key(self) -> str:
+        return self.api_key()
+
+    def api_key(self) -> str:
         from botocore.exceptions import ClientError
 
         with self._lock:
@@ -193,7 +200,7 @@ class AgentCoreApiKeyProvider:
                 )["apiKey"]
             except ClientError as exc:
                 code = exc.response.get("Error", {}).get("Code", "Error")
-                raise CredentialError(f"AgentCore Identity refused the Safe Browsing key request ({code}).") from exc
+                raise CredentialError(f"AgentCore Identity refused the {self.what} request ({code}).") from exc
             self._cached = (key, datetime.now(UTC))
             return key
 
