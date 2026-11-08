@@ -1,5 +1,8 @@
 """Verdict and user/guardian storage. Stores verdicts and evidence, never email bodies.
 
+Flagged emails (scam or suspicious) also keep their From line, subject and date, so the dashboard
+can show the person which emails were caught. Emails judged fine keep only their verdict.
+
 LocalStore (a JSON file) is for Phase 1 on a laptop. DynamoStore uses one table:
     pk = "USER#<user_id>", sk = "PROFILE"            -> UserProfile
     pk = "USER#<user_id>", sk = "EMAIL#<email_id>"   -> EmailRecord
@@ -47,6 +50,14 @@ class EmailRecord:
     reasons: list[str] = field(default_factory=list)
     warned_at: str | None = None
     warned_recipients: list[str] = field(default_factory=list)
+    # Only for flagged emails, so the dashboard can say which email was caught.
+    sender_name: str | None = None
+    sender_domain: str | None = None
+    subject: str | None = None
+    received_at: str | None = None
+    # Set when the person or their family contact says a flagged email is fine ("Mark as safe").
+    marked_safe_at: str | None = None
+    marked_safe_by: str | None = None
 
 
 @dataclass
@@ -70,6 +81,8 @@ class Store(Protocol):
     def checked_ids(self, user_id: str, email_ids: list[str]) -> set[str]: ...
     def get_email(self, user_id: str, email_id: str) -> EmailRecord | None: ...
     def put_email(self, record: EmailRecord) -> None: ...
+    def update_email(self, user_id: str, email_id: str, fields: dict) -> None: ...
+    def list_emails(self, user_id: str) -> list[EmailRecord]: ...
     def put_invite(self, invite: Invite) -> None: ...
     def get_invite(self, token: str) -> Invite | None: ...
     def list_invites(self) -> list[Invite]: ...
@@ -122,6 +135,21 @@ class LocalStore:
             data = self._load()
             data["emails"].setdefault(record.user_id, {})[record.email_id] = asdict(record)
             self._save(data)
+
+    def update_email(self, user_id: str, email_id: str, fields: dict) -> None:
+        _check_fields(fields)
+        with self._lock:
+            data = self._load()
+            mine = data["emails"].setdefault(user_id, {})
+            raw = mine.get(email_id) or asdict(EmailRecord(user_id=user_id, email_id=email_id, verdict=fields.get("verdict", "fine")))
+            raw.update(fields)
+            mine[email_id] = raw
+            self._save(data)
+
+    def list_emails(self, user_id: str) -> list[EmailRecord]:
+        with self._lock:
+            mine = self._load()["emails"].get(user_id, {})
+        return [EmailRecord(**raw) for raw in mine.values()]
 
     def put_invite(self, invite: Invite) -> None:
         with self._lock:
@@ -188,17 +216,58 @@ class DynamoStore:
         return found
 
     def get_email(self, user_id: str, email_id: str) -> EmailRecord | None:
-        item = self._table.get_item(Key={"pk": self._pk(user_id), "sk": f"EMAIL#{email_id}"}).get("Item")
-        if not item:
-            return None
+        # Strongly consistent: the tools read a record right after another tool wrote it.
+        item = self._table.get_item(Key={"pk": self._pk(user_id), "sk": f"EMAIL#{email_id}"}, ConsistentRead=True).get("Item")
+        return self._email(item) if item else None
+
+    @staticmethod
+    def _email(item: dict) -> EmailRecord:
         fields = {k: item[k] for k in EmailRecord.__dataclass_fields__ if k in item}
         fields["reasons"] = list(fields.get("reasons", []))
         fields["warned_recipients"] = list(fields.get("warned_recipients", []))
         return EmailRecord(**fields)
 
+    def list_emails(self, user_id: str) -> list[EmailRecord]:
+        from boto3.dynamodb.conditions import Key
+
+        records: list[EmailRecord] = []
+        kwargs: dict = {"KeyConditionExpression": Key("pk").eq(self._pk(user_id)) & Key("sk").begins_with("EMAIL#")}
+        while True:
+            resp = self._table.query(**kwargs)
+            records += [self._email(item) for item in resp["Items"]]
+            if "LastEvaluatedKey" not in resp:
+                break
+            kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+        return records
+
     def put_email(self, record: EmailRecord) -> None:
         item = {k: v for k, v in asdict(record).items() if v is not None}
         self._table.put_item(Item={"pk": self._pk(record.user_id), "sk": f"EMAIL#{record.email_id}", **item})
+
+    def update_email(self, user_id: str, email_id: str, fields: dict) -> None:
+        """Set only these fields (None removes one), so tools that touch different fields of the
+        same email can't overwrite each other's work. Creates the record if it doesn't exist."""
+        _check_fields(fields)
+        values = {"user_id": user_id, "email_id": email_id, **fields}
+        sets = {k: v for k, v in values.items() if v is not None}
+        removes = [k for k, v in values.items() if v is None]
+        names = {f"#f{i}": k for i, k in enumerate(values)}
+        by_name = {k: n for n, k in names.items()}
+        expr = "SET " + ", ".join(f"{by_name[k]} = :v{i}" for i, k in enumerate(sets))
+        if "verdict" not in fields:  # a brand-new record still needs a verdict
+            expr += ", #verdict = if_not_exists(#verdict, :fine)"
+            names["#verdict"] = "verdict"
+        if removes:
+            expr += " REMOVE " + ", ".join(by_name[k] for k in removes)
+        attr_values = {f":v{i}": v for i, v in enumerate(sets.values())}
+        if "verdict" not in fields:
+            attr_values[":fine"] = "fine"
+        self._table.update_item(
+            Key={"pk": self._pk(user_id), "sk": f"EMAIL#{email_id}"},
+            UpdateExpression=expr,
+            ExpressionAttributeNames=names,
+            ExpressionAttributeValues=attr_values,
+        )
 
     def put_invite(self, invite: Invite) -> None:
         item = {k: v for k, v in asdict(invite).items() if v is not None}
@@ -221,6 +290,12 @@ class DynamoStore:
                 break
             kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
         return sorted(invites, key=lambda i: i.created_at)
+
+
+def _check_fields(fields: dict) -> None:
+    unknown = set(fields) - set(EmailRecord.__dataclass_fields__) | ({"user_id", "email_id"} & set(fields))
+    if unknown:
+        raise ValueError(f"Can't update these email fields: {sorted(unknown)}")
 
 
 def make_store(settings: Settings) -> Store:

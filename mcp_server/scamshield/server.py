@@ -9,6 +9,8 @@ import functools
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import UTC
+from email.utils import parseaddr, parsedate_to_datetime
 from typing import Annotated, Literal
 
 from mcp.server import MCPServer
@@ -272,7 +274,15 @@ def check_threat_list(
     if not clean:
         raise ToolError("url must be a full http:// or https:// link.")
     s = services()
-    result = s.safebrowsing_factory(s.api_keys.safe_browsing_key()).check(clean)
+    try:
+        key = s.api_keys.safe_browsing_key()
+    except CredentialError as exc:
+        log.warning("check_threat_list unavailable: %s", exc)
+        raise ToolError(
+            "Safe Browsing is not available right now (no API key is set up). Don't call check_threat_list "
+            "again in this scan; decide from the other evidence."
+        ) from exc
+    result = s.safebrowsing_factory(key).check(clean)
     log.info("check_threat_list flagged=%s threat=%s", result.flagged, result.threat_type)
     return result
 
@@ -303,11 +313,35 @@ def label_email(
         gmail.add_label(email_id, gmail.ensure_label(s.settings.label_name))
         labeled = True
 
-    record = s.store.get_email(uid, email_id) or EmailRecord(user_id=uid, email_id=email_id, verdict=verdict)
-    record.verdict, record.labeled, record.checked_at = verdict, record.labeled or labeled, now_iso()
-    s.store.put_email(record)
+    # Only the fields this tool owns: send_warning may be writing the reasons for the same email.
+    existing = s.store.get_email(uid, email_id)
+    fields: dict = {"verdict": verdict, "checked_at": now_iso(), "labeled": bool(existing and existing.labeled) or labeled}
+    if labeled and not (existing and existing.subject):
+        fields.update(_flagged_fields(gmail, uid, email_id))
+    s.store.update_email(uid, email_id, fields)
     log.info("label_email user=%s email=%s verdict=%s labeled=%s", uid, email_id, verdict, labeled)
     return LabelResult(ok=True, labeled=labeled, verdict=verdict)
+
+
+def _flagged_fields(gmail: GmailClient, uid: str, email_id: str) -> dict:
+    """The From line, subject and date of a flagged email, kept for the dashboard (never the body).
+    Best effort: the label is already on, so a failed lookup only leaves these fields empty."""
+    try:
+        headers = gmail.get_headers(email_id, ["From", "Subject", "Date"])
+    except GmailError:
+        log.warning("could not read headers user=%s email=%s", uid, email_id)
+        return {}
+    _, sender_domain = sender_domain_of(headers.get("from", ""))
+    try:
+        received = parsedate_to_datetime(headers["date"]).astimezone(UTC).isoformat(timespec="seconds")
+    except (KeyError, TypeError, ValueError):
+        received = None
+    return {
+        "sender_domain": sender_domain or None,
+        "sender_name": collapse_whitespace(parseaddr(headers.get("from", ""))[0])[:80] or None,
+        "subject": collapse_whitespace(headers.get("subject", ""))[:200] or None,
+        "received_at": received,
+    }
 
 
 @mcp.tool(
@@ -396,11 +430,15 @@ def send_warning(
                 raise ToolError(f"Could not deliver the warning to {to}.{done}") from exc
             sent.append(to)
     finally:
-        record.verdict, record.reasons = verdict, clean
-        record.warned_recipients = list(dict.fromkeys([*record.warned_recipients, *sent]))
+        # Only the fields this tool owns: label_email may be writing the same email at the same time.
+        fields: dict = {
+            "verdict": verdict,
+            "reasons": clean,
+            "warned_recipients": list(dict.fromkeys([*record.warned_recipients, *sent])),
+        }
         if sent:
-            record.warned_at = now_iso()
-        s.store.put_email(record)
+            fields["warned_at"] = now_iso()
+        s.store.update_email(uid, email_id, fields)
 
     log.info("send_warning user=%s email=%s verdict=%s sent=%d", uid, email_id, verdict, len(sent))
     return WarningResult(ok=True, recipients=wanted)

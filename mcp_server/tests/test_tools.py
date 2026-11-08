@@ -91,6 +91,13 @@ async def test_label_email_only_labels_risky_mail(env):
     assert scam.structured_content == {"ok": True, "labeled": True, "verdict": "scam"}
     assert env.gmail.applied == [(SCAM_ID, "Label_1")]
 
+    # Flagged emails keep their From line and subject for the dashboard; fine ones keep only the verdict.
+    store = env.services.store
+    flagged, plain = store.get_email("grandma", SCAM_ID), store.get_email("grandma", PLAIN_ID)
+    assert flagged.sender_domain and flagged.subject and flagged.verdict == "scam"
+    assert (plain.subject, plain.sender_domain) == (None, None)
+    assert {r.email_id for r in store.list_emails("grandma")} == {SCAM_ID, PLAIN_ID}
+
     nope = await call("label_email", {"user_id": "grandma", "email_id": SCAM_ID, "verdict": "delete"})
     assert nope.is_error
 
@@ -121,6 +128,11 @@ async def test_send_warning_to_user_and_guardian(env):
     again = await call("send_warning", args)
     assert again.structured_content["already_sent"] is True
     assert len(env.outbox.sent) == 2
+
+    # The agent labels after warning (the order seen in real scans): the reasons must survive.
+    await call("label_email", {"user_id": "grandma", "email_id": SCAM_ID, "verdict": "scam"})
+    record = env.store.get_email("grandma", SCAM_ID)
+    assert record.labeled and len(record.reasons) == 2 and record.warned_at and record.subject
 
 
 async def test_send_warning_refuses_injected_recipient(env):
