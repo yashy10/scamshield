@@ -37,7 +37,8 @@ agent/                 the investigator agent (Strands + Claude Opus 5.5 on Bedr
 infra/                 CDK: DynamoDB table, SES identities, MCP-server IAM policy, EventBridge schedules
 deploy/                AgentCore CLI project + Phase 3 runbook
 demo/                  simulated inbox (inbox.json) and the real demo emails
-web/                   sign-up site: guardian invites, "Connect my Gmail", people page with Scan now
+frontend/              the web app (Next.js 16, React 19, Tailwind 4): landing page, sign-in, onboarding, dashboard
+web/                   Python site: JSON API for frontend/, Google sign-in, Gmail consent, admin people page
 app.py, requirements.txt, vercel.json   Vercel entry for the sign-up site
 ```
 
@@ -101,6 +102,61 @@ and `vercel.json` belong to that deployment only.
   `SCAMSHIELD_WEB_BASE_URL`, and the secrets `SCAMSHIELD_WEB_SECRET`, `SCAMSHIELD_ADMIN_PASSWORD`.
 - Google needs a **Web application** OAuth client whose Authorized redirect URI is the provider's AgentCore
   callback URL; load it with `cd mcp_server && uv run scripts/load_google_client.py <client.json>`.
+- **Dashboard sign-in** uses the same Google client (scopes `openid email profile` only). Add
+  `https://<site>/signin/callback` (and `http://localhost:8080/signin/callback` for local work) to its Authorized
+  redirect URIs, and set `SCAMSHIELD_GOOGLE_CLIENT_ID` / `SCAMSHIELD_GOOGLE_CLIENT_SECRET` on Vercel (locally the
+  site reads `.local/secrets/google_web_client.json`). The dashboard lists a person's results with
+  `dynamodb:Query`, so the `scamshield-vercel` role needs that action on the table.
+
+### Running the web app locally (Next.js + the Python API)
+
+The UI lives in `frontend/` (Next.js). The Python site in `web/` is its backend; Next.js proxies `/api/*` and the
+sign-in and Gmail-connection paths to it, so the browser sees one origin and one session cookie.
+
+```bash
+# 1. Python API with demo data (three people, eight weeks of results, in .local/demo-store.json)
+cd web
+uv run python scripts/seed_demo.py
+SCAMSHIELD_WEB_BASE_URL=http://localhost:3000 SCAMSHIELD_STORE=local \
+  SCAMSHIELD_LOCAL_STORE_PATH=../.local/demo-store.json SCAMSHIELD_DEV_SIGNIN=1 uv run python app.py
+
+# 2. The web app, in another terminal (Node 20.9+)
+cd frontend
+npm install
+npm run dev            # http://localhost:3000 (SCAMSHIELD_API_URL defaults to http://127.0.0.1:8080)
+```
+
+Open http://localhost:3000, choose **Sign in**, and use the local preview box: `alex@example.com` is the family
+contact for three people; `margaret.demo@gmail.com` sees her own inbox. The preview box exists only on localhost
+with `SCAMSHIELD_DEV_SIGNIN=1`, never on Vercel. For real Google sign-in, add
+`http://localhost:3000/signin/callback` to the Google client's Authorized redirect URIs.
+
+`npm run build` type-checks and builds. The current Vercel project still serves the Python site only
+(`.vercelignore` leaves `frontend/` out); hosting the Next.js app means a Vercel project with two services
+(Next.js at `/`, Python for the proxied paths) or two projects with `SCAMSHIELD_API_URL` pointing at the API.
+
+### Frontend API (for the Next.js app in `frontend/`)
+
+The Python site (`web/scamshield_web/api.py`) serves JSON to the Next.js frontend, using the same session
+cookie as its pages. Every `POST /api/*` needs the header `X-ScamShield-Client: web`; responses are
+camelCase and `Cache-Control: no-store`.
+
+| Endpoint | What it does |
+|---|---|
+| `GET /api/session` | `{account, googleSignIn, devSignIn}` |
+| `GET /api/dashboard?person=&period=7\|30\|all&tz=` | People the account can see, waiting invites, and one inbox's view (status, counts, previous period, daily or weekly series in the viewer's time zone, flagged emails, Scan now state). 401 when signed out. Family contacts get `subject: null`. |
+| `GET`/`POST /api/people/{id}/scan` | Scan now: state, or start one (202; 200 if already running; 503 if it can't start) |
+| `POST /api/people/{id}/emails/{emailId}/safe` | `{"safe": true\|false}`: mark a flagged email as safe, or undo. Marked emails count as safe. |
+| `POST /api/signup` | Guardian sign-up: 201 `{token, inviteUrl}` or 400 `{errors}` |
+| `GET /api/invites/{token}` | `{protectedName, guardianName, connected, inviteUrl}` |
+
+The frontend proxies these paths to the Python site: `/api/*`, `/signin/google`, `/signin/callback`,
+`/signin/dev`, `/signout`, `/join/*/connect`, `/connect/callback`, `/people*` and `/static/*` (and `/` when it
+carries Google's `state`, with `code` or `error`, in local consent mode). Those redirects report problems as
+`/signin?error=<code>` (`cancelled`, `restart`, `google`, `wrong_client`, `expired`, `unverified`,
+`not_configured`, `bad_email`) and `/connect/problem?error=<code>&token=` (`restart`, `bad_invite`,
+`not_connected`, `failed`, `unavailable`). Set `SCAMSHIELD_WEB_BASE_URL` to the frontend's origin
+(`http://localhost:3000` in development) so invite links and OAuth redirect URIs point at it.
 
 ## Design decisions and deviations from the PRD
 

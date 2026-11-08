@@ -75,6 +75,9 @@ The hackathon organization's SCP denies AgentCore and `bedrock-mantle` in us-wes
     URLs: `https://scamshield-lac-two.vercel.app/connect/callback`, `http://localhost:8080/connect/callback`.
   - OAuth2 credential provider **`scamshield-google`** (vendor GoogleOauth2). Load the Google *Web application* client
     into it with `cd mcp_server && uv run scripts/load_google_client.py ../.local/secrets/google_web_client.json`.
+  - API key credential provider **`scamshield-safe-browsing`** (2026-11-08): the Google Safe Browsing key, read by
+    `check_threat_list`. The MCP runtime's role needs `bedrock-agentcore:GetResourceApiKey` on it (and on the
+    workload identity) plus read access to its Secrets Manager secret.
 - The sign-up site runs on Vercel (see the root README); users connect Gmail there.
 
 So in the runbook below: skip the `GoogleGmail` credential in step 4, the Google redirect-URI lookup in step 7,
