@@ -34,7 +34,11 @@ class ScriptedModel(Model):
         n = len(self.requests)
         yield {"messageStart": {"role": "assistant"}}
         used_tool = False
+        cut_off = False
         for i, item in enumerate(turn):
+            if item[0] == "max_tokens":  # the turn is cut off by the output limit here
+                cut_off = True
+                break
             if item[0] == "text":
                 yield {"contentBlockStart": {"start": {}}}
                 yield {"contentBlockDelta": {"delta": {"text": item[1]}}}
@@ -44,7 +48,7 @@ class ScriptedModel(Model):
                 yield {"contentBlockStart": {"start": {"toolUse": {"toolUseId": f"call-{n}-{i}", "name": name}}}}
                 yield {"contentBlockDelta": {"delta": {"toolUse": {"input": json.dumps(args)}}}}
             yield {"contentBlockStop": {}}
-        yield {"messageStop": {"stopReason": "tool_use" if used_tool else "end_turn"}}
+        yield {"messageStop": {"stopReason": "max_tokens" if cut_off else "tool_use" if used_tool else "end_turn"}}
 
 
 def tool_results(messages: list[dict]) -> dict[str, list[dict]]:

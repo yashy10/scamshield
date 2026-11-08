@@ -96,3 +96,24 @@ def test_injected_recipient_is_refused(mcp):
     warning = next(c for c in result.tool_calls if c["tool"] == "send_warning")
     assert warning["status"] == "error"
     assert fake.outbox.sent == []  # nobody was emailed, least of all helper@
+
+
+def test_scan_continues_after_output_limit(mcp):
+    fake, settings = mcp
+    seed_scam_and_newsletter(fake)
+    model = ScriptedModel([
+        [("tool", "get_new_emails", {"user_id": "grandma"})],
+        [("text", "Let me weigh all of these emails together"), ("max_tokens",)],  # cut off mid-thought
+        [
+            ("tool", "label_email", {"user_id": "grandma", "email_id": SCAM_ID, "verdict": "suspicious"}),
+            ("tool", "label_email", {"user_id": "grandma", "email_id": NEWS_ID, "verdict": "fine"}),
+        ],
+        [("text", "Done.")],
+    ])
+
+    result = run_scan("grandma", settings=settings, model=model)
+
+    assert result.summary == "Done."
+    continued = model.requests[2]["messages"][-1]["content"][0]["text"]
+    assert "cut off" in continued
+    assert fake.store.get_email("grandma", NEWS_ID).verdict == "fine"

@@ -23,6 +23,7 @@ def build_model(cfg: AgentSettings) -> Model:
     effort = {"output_config": {"effort": cfg.effort}}
 
     if cfg.model_provider == "converse":
+        from botocore.config import Config
         from strands.models.bedrock import BedrockModel
 
         return BedrockModel(
@@ -30,6 +31,9 @@ def build_model(cfg: AgentSettings) -> Model:
             region_name=cfg.region,
             max_tokens=cfg.max_tokens,
             additional_request_fields=effort,
+            # One turn can think about ten emails before it streams anything, and Bedrock sometimes
+            # throttles or drops a stream: wait longer and retry with backoff instead of failing the scan.
+            boto_client_config=Config(read_timeout=300, connect_timeout=10, retries={"max_attempts": 6, "mode": "adaptive"}),
         )
 
     if cfg.model_provider == "mantle":

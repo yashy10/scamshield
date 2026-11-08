@@ -56,7 +56,8 @@ def get_settings() -> AgentSettings:
             "anthropic.claude-opus-5-5" if provider == "mantle" else "us.anthropic.claude-opus-5-5",
         ),
         effort=env("SCAMSHIELD_EFFORT", "medium"),
-        max_tokens=int(env("SCAMSHIELD_MAX_TOKENS", "16000")),
+        # Opus 5.5 can write up to 128K tokens; a turn that weighs ten emails and plans ~50 lookups needs room.
+        max_tokens=int(env("SCAMSHIELD_MAX_TOKENS", "64000")),
         region=env("SCAMSHIELD_AWS_REGION") or env("AWS_REGION") or env("AWS_DEFAULT_REGION") or "us-east-1",
         gateway_auth=env("SCAMSHIELD_GATEWAY_AUTH", "agentcore-m2m" if on_gateway else "none").lower(),
         gateway_provider=_provider_name(

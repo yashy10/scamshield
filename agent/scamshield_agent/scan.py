@@ -10,6 +10,7 @@ from typing import Any
 from strands import Agent
 from strands.models import Model
 from strands.tools.mcp import MCPClient
+from strands.types.exceptions import MaxTokensReachedException
 
 from .config import AgentSettings, get_settings
 from .hooks import PinUserId, ToolLog
@@ -20,6 +21,11 @@ from .prompt import build_system_prompt
 log = logging.getLogger("scamshield.agent")
 
 SCAN_PROMPT = "Run a scan of the inbox now."
+CONTINUE_PROMPT = (
+    "Your last reply was cut off by the length limit. Continue the scan from where you stopped: "
+    "finish investigating, labeling and warning about the remaining emails, a few at a time."
+)
+MAX_CONTINUES = 2
 
 
 @dataclass
@@ -68,7 +74,18 @@ def run_scan(
             hooks=[pin, tool_log],
             callback_handler=None,
         )
-        result = agent(SCAN_PROMPT)
+        # A turn that thinks about many emails at once can hit the output limit. The partial turn stays in
+        # the conversation, so ask the agent to carry on rather than failing the whole scan.
+        prompt = SCAN_PROMPT
+        for attempt in range(MAX_CONTINUES + 1):
+            try:
+                result = agent(prompt)
+                break
+            except MaxTokensReachedException:
+                if attempt == MAX_CONTINUES:
+                    raise
+                log.warning("scan user=%s hit the output limit; continuing (%d)", profile.user_id, attempt + 1)
+                prompt = CONTINUE_PROMPT
 
     log.info("scan user=%s tool_calls=%d user_id_overrides=%d", profile.user_id, len(tool_log.calls), pin.overrides)
     return ScanResult(
