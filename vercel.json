@@ -1,9 +1,35 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "functions": {
-    "app.py": {
-      "maxDuration": 60,
-      "excludeFiles": "{agent/**,infra/**,deploy/**,demo/**,**/tests/**,mcp_server/scripts/**,web/scripts/**,**/.venv/**,**/uv.lock,**/*.md,.local/**}"
+  "services": {
+    "web": {
+      "root": "frontend",
+      "framework": "nextjs",
+      "bindings": [
+        { "type": "service", "service": "api", "format": "url", "env": "SCAMSHIELD_API_URL" }
+      ]
+    },
+    "api": {
+      "root": ".",
+      "entrypoint": "app.py",
+      "functions": {
+        "app.py": {
+          "maxDuration": 60,
+          "excludeFiles": "{frontend/**,agent/**,infra/**,deploy/**,demo/**,**/tests/**,mcp_server/scripts/**,web/scripts/**,**/.venv/**,**/node_modules/**,**/uv.lock,**/*.md,.local/**}"
+        }
+      }
     }
-  }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": { "service": "api" } },
+    { "source": "/signin/google", "destination": { "service": "api" } },
+    { "source": "/signin/callback", "destination": { "service": "api" } },
+    { "source": "/signin/dev", "destination": { "service": "api" } },
+    { "source": "/signout", "destination": { "service": "api" } },
+    { "source": "/join/:token/connect", "destination": { "service": "api" } },
+    { "source": "/connect/callback", "destination": { "service": "api" } },
+    { "source": "/people", "destination": { "service": "api" } },
+    { "source": "/people/(.*)", "destination": { "service": "api" } },
+    { "source": "/static/(.*)", "destination": { "service": "api" } },
+    { "source": "/(.*)", "destination": { "service": "web" } }
+  ]
 }

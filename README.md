@@ -82,11 +82,18 @@ client; if Google reports `redirect_uri_mismatch`, set `SCAMSHIELD_WEB_BASE_URL=
 `http://localhost:8080/connect/callback`, which must be allowed on the MCP runtime's workload identity.
 Scan now runs the local agent, or the deployed one when `SCAMSHIELD_AGENT_ARN` is set.
 
-## Hosting the sign-up site on Vercel
+## Hosting on Vercel
 
 Live at **https://scamshield-lac-two.vercel.app** (Vercel project `scamshield`, scope QuanteaTransfer), deployed
-from `main` on every push. The repo-root `app.py` wraps `web/` for Vercel's FastAPI preset; `requirements.txt`
-and `vercel.json` belong to that deployment only.
+from `main` on every push. The project runs two **Vercel Services** that ship together (`vercel.json`):
+
+- `web`: the Next.js app in `frontend/`, serving every page.
+- `api`: the Python site (the repo-root `app.py` wraps `web/`; `requirements.txt` is its dependencies), serving
+  `/api/*`, `/signin/{google,callback,dev}`, `/signout`, `/join/*/connect`, `/connect/callback`, `/people*` and
+  `/static/*`.
+
+The Next.js server calls the Python service over a private service binding (`SCAMSHIELD_API_URL`), passing the
+visitor's cookie and Vercel's OIDC token along, so both share one origin and one session.
 
 - **No AWS keys anywhere.** The site assumes the IAM role `scamshield-vercel` with Vercel's OIDC token
   (`SCAMSHIELD_AWS_ROLE_ARN`). The role trusts only `owner:quantea-transfer:project:scamshield` and can only use
@@ -102,11 +109,11 @@ and `vercel.json` belong to that deployment only.
   `SCAMSHIELD_WEB_BASE_URL`, and the secrets `SCAMSHIELD_WEB_SECRET`, `SCAMSHIELD_ADMIN_PASSWORD`.
 - Google needs a **Web application** OAuth client whose Authorized redirect URI is the provider's AgentCore
   callback URL; load it with `cd mcp_server && uv run scripts/load_google_client.py <client.json>`.
-- **Dashboard sign-in** uses the same Google client (scopes `openid email profile` only). Add
-  `https://<site>/signin/callback` (and `http://localhost:8080/signin/callback` for local work) to its Authorized
-  redirect URIs, and set `SCAMSHIELD_GOOGLE_CLIENT_ID` / `SCAMSHIELD_GOOGLE_CLIENT_SECRET` on Vercel (locally the
-  site reads `.local/secrets/google_web_client.json`). The dashboard lists a person's results with
-  `dynamodb:Query`, so the `scamshield-vercel` role needs that action on the table.
+- **Dashboard sign-in** uses the same Google client (scopes `openid email profile` only). Its Authorized
+  redirect URIs include `https://<site>/signin/callback` and `http://localhost:3000/signin/callback`;
+  `SCAMSHIELD_GOOGLE_CLIENT_ID` / `SCAMSHIELD_GOOGLE_CLIENT_SECRET` are set on Vercel for production (locally the
+  site reads `.local/secrets/google_web_client.json`). The `scamshield-vercel` role also has `dynamodb:Query` (the
+  dashboard) and `dynamodb:UpdateItem` (marking an email safe) on the table.
 
 ### Running the web app locally (Next.js + the Python API)
 
@@ -131,9 +138,8 @@ contact for three people; `margaret.demo@gmail.com` sees her own inbox. The prev
 with `SCAMSHIELD_DEV_SIGNIN=1`, never on Vercel. For real Google sign-in, add
 `http://localhost:3000/signin/callback` to the Google client's Authorized redirect URIs.
 
-`npm run build` type-checks and builds. The current Vercel project still serves the Python site only
-(`.vercelignore` leaves `frontend/` out); hosting the Next.js app means a Vercel project with two services
-(Next.js at `/`, Python for the proxied paths) or two projects with `SCAMSHIELD_API_URL` pointing at the API.
+`npm run build` type-checks and builds. On Vercel the same app runs as the `web` service (see "Hosting on
+Vercel"); the local proxy in `next.config.ts` is switched off there because `vercel.json` does the routing.
 
 ### Frontend API (for the Next.js app in `frontend/`)
 

@@ -70,6 +70,7 @@ def test_policy_actions_without_ses():
     assert actions(policy_statements(t)) == {
         "dynamodb:GetItem",
         "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
         "dynamodb:BatchGetItem",
         "bedrock-agentcore:GetWorkloadAccessTokenForUserId",
         "bedrock-agentcore:GetResourceOauth2Token",

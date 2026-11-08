@@ -112,7 +112,7 @@ class ScamShieldInfraStack(Stack):
         statements = [
             iam.PolicyStatement(
                 sid="VerdictTable",
-                actions=["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:BatchGetItem"],
+                actions=["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:BatchGetItem"],
                 resources=[table.table_arn],
             ),
         ]

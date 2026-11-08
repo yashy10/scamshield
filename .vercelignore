@@ -1,4 +1,5 @@
-# Only the sign-up site (app.py, web/, mcp_server/scamshield) is deployed to Vercel.
+# Deployed to Vercel as two services (vercel.json): the Next.js app in frontend/ and the Python site
+# (app.py -> web/ + mcp_server/scamshield). Everything else stays out of the upload.
 agent/
 infra/
 deploy/
@@ -10,5 +11,4 @@ web/scripts/
 **/.venv/
 **/tests/
 **/node_modules/
-# The Next.js app (frontend/) deploys separately; this project serves the Python site.
-frontend/
+**/.next/
