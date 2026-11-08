@@ -30,3 +30,7 @@ cdk.out/
 
 # The PRD stays on this machine only
 ScamShield PRD.pdf
+
+# Vercel CLI link
+.vercel
+.env*
